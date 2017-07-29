@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	baselog "log"
 	"net"
 	"net/http"
 	"strings"
@@ -28,6 +29,7 @@ var (
 	httpAddr      = flag.String("http-addr", "127.0.0.1:9090", "HTTP bind address")
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
+	showVersion   = flag.Bool("version", false, "Show version")
 	debug         = flag.Bool("debug", false, "Turn no debug mode")
 )
 
@@ -42,8 +44,13 @@ func printStartBanner(conf *fidias.Config) {
 
 func configure(conf *fidias.Config) {
 	if *debug {
+		// Setup the standard built-in log for underlying libraries
+		baselog.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
+		baselog.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
+		// Setup hexablock/log
 		log.SetLevel("DEBUG")
 		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
+		log.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 
 		// Lower the stabilization time in debug mode
 		conf.Ring.StabilizeMin = 1 * time.Second
@@ -76,6 +83,11 @@ func init() {
 
 func main() {
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version, buildtime)
+		return
+	}
 
 	// Configuration
 	conf := fidias.DefaultConfig(*clusterAddr)

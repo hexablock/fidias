@@ -7,15 +7,11 @@ import chord "github.com/hexablock/go-chord"
 // new predecessor.
 func (fidias *Fidias) NewPredecessor(local, newPred, oldPred *chord.Vnode) {
 
-	// if oldPred == nil {
-	//
-	// }
-
 	if local.Host == newPred.Host {
 		return
 	}
 
-	rr := &RebalanceRequest{Src: local, Dst: newPred}
+	rr := &RebalanceRequest{Src: local, Old: oldPred, Dst: newPred}
 	fidias.rebalanceCh <- rr
 
 }
