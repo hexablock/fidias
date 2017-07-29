@@ -47,6 +47,12 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code, headers, data, err := handler(w, r, resourceID)
+	if code == statusCodeRedirect {
+		urlstr := data.(string)
+		http.Redirect(w, r, urlstr, code)
+		return
+	}
+
 	writeJSONResponse(w, code, headers, data, err)
 }
 

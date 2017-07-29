@@ -28,8 +28,8 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 			var id []byte
 			if id, err = hex.DecodeString(keid[1]); err == nil {
 				key := []byte(keid[0])
-				entry, ok := server.logstore.GetEntry(key, id)
-				if !ok {
+				var entry *hexalog.Entry
+				if entry, _, err = server.fidias.GetEntry(key, id); err != nil {
 					code = 404
 				} else {
 					data = &KeyValueItem{Key: keid[0], Entry: entry, Value: entry.Data[1:]}
@@ -56,11 +56,20 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		entry.Data = append([]byte{opSet}, b...)
 		code = 200
 
-		var ballot *hexalog.Ballot
-		if ballot, err = server.fidias.ProposeEntry(entry); err == nil {
+		var (
+			ballot *hexalog.Ballot
+			meta   *ReMeta
+		)
+		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
 			}
+		} else if strings.Contains(err.Error(), "not in peer set") {
+			// Redirect to the natural key holder
+			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
+				code = statusCodeRedirect
+			}
+
 		}
 
 	case http.MethodDelete:
@@ -69,12 +78,21 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		entry.Data = []byte{opDel}
 		code = 200
 
-		var ballot *hexalog.Ballot
-		if ballot, err = server.fidias.ProposeEntry(entry); err == nil {
+		var (
+			ballot *hexalog.Ballot
+			meta   *ReMeta
+		)
+		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
 			}
+		} else if strings.Contains(err.Error(), "not in peer set") {
+			// Redirect to the natural key holder
+			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
+				code = statusCodeRedirect
+			}
 		}
+
 	case http.MethodOptions:
 		code = 200
 		headers["Content-Type"] = contentTypeTextPlain

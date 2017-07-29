@@ -2,11 +2,32 @@ package fidias
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/hexablock/go-chord"
 )
 
 const contentTypeTextPlain = "text/plain"
+
+// statusCodeRedirect will keep the data for the call
+const statusCodeRedirect = 307
+
+var accessControlHeaders = map[string]string{
+	"Access-Control-Allow-Origin": "*",
+}
+
+// generateRedirect generates the redirect url based on the given vnode
+func generateRedirect(vn *chord.Vnode, reqURI string) (s string, err error) {
+	mt := chord.Meta{}
+	if err = mt.UnmarshalBinary(vn.Meta); err == nil {
+		host, _ := mt["http"]
+		s = fmt.Sprintf("http://%s%s", host, reqURI)
+	}
+
+	return
+}
 
 // parseIntQueryParam parses an int from the url query parameters.  It only uses the first
 // element of the param slice
@@ -51,8 +72,14 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 		}
 
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Set headers supplied as input
 	for k, v := range headers {
+		w.Header().Set(k, v)
+	}
+
+	// Set ACL headers after so they are not overwritten by the caller
+	for k, v := range accessControlHeaders {
 		w.Header().Set(k, v)
 	}
 

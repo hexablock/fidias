@@ -2,9 +2,29 @@ package fidias
 
 import (
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	chord "github.com/hexablock/go-chord"
 )
+
+func Test_parseIntQueryParam(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/foo?r=3", nil)
+	r, err := parseIntQueryParam(req, "r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != 3 {
+		t.Fatal("param mismatch")
+	}
+
+	req2, _ := http.NewRequest("GET", "/foo", nil)
+	r2, _ := parseIntQueryParam(req2, "r")
+	if r2 != 0 {
+		t.Fatal("r should be 0")
+	}
+}
 
 func Test_writeJSONResponse_data(t *testing.T) {
 	w := httptest.NewRecorder()
@@ -34,6 +54,16 @@ func Test_writeJSONResponse_data(t *testing.T) {
 	cth = rsp2.Header["Content-Type"]
 	if cth != nil {
 		t.Fatal("should be nil")
+	}
+}
+
+func Test_generateRedirect(t *testing.T) {
+	s, err := generateRedirect(&chord.Vnode{Meta: []byte("http=foo")}, "/foo/bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != "http://foo/foo/bar" {
+		t.Fatal("url mismatch")
 	}
 }
 

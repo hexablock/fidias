@@ -29,8 +29,7 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 			var id []byte
 			if id, err = hex.DecodeString(keid[1]); err == nil {
 				key := []byte(keid[0])
-				var ok bool
-				if data, ok = server.logstore.GetEntry(key, id); !ok {
+				if data, _, err = server.fidias.GetEntry(key, id); err != nil {
 					code = 404
 				}
 			}
@@ -38,7 +37,6 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 			// Get the complete log.
 			data, err = server.logstore.GetKey([]byte(resourceID))
 		}
-		// Get a keylog
 
 	case http.MethodPost:
 		// Append an entry to the keylog
@@ -51,11 +49,20 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 		entry := server.fidias.NewEntry([]byte(resourceID))
 		entry.Data = b
 
-		var ballot *hexalog.Ballot
-		if ballot, err = server.fidias.ProposeEntry(entry); err == nil {
+		var (
+			ballot *hexalog.Ballot
+			meta   *ReMeta
+		)
+		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
 			}
+		} else if strings.Contains(err.Error(), "not in peer set") {
+			// Redirect to the natural key holder
+			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
+				code = statusCodeRedirect
+			}
+
 		}
 
 	case http.MethodOptions:
