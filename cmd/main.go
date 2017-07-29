@@ -48,7 +48,7 @@ func configure(conf *fidias.Config) {
 		baselog.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		baselog.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 		// Setup hexablock/log
-		log.SetLevel("DEBUG")
+		log.SetLevel(log.LogLevelDebug)
 		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		log.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 
