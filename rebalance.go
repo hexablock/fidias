@@ -10,24 +10,26 @@ import (
 // RebalanceRequest is used to issue a rebalancing of keys.  All key hashes less than that
 // of the destination id are transferred to the destination
 type RebalanceRequest struct {
-	Src *chord.Vnode
-	Dst *chord.Vnode
+	Src *chord.Vnode // Source vnode.  Is a local vnode
+	Old *chord.Vnode // The old vnode prior the Dst predecessor
+	Dst *chord.Vnode // New vnode to transfer data to
 }
 
+// rebalance gets the keys within the range of src and dst and issues transfers requests
+// if and as needed.
 func (fidias *Fidias) rebalance(src, dst *chord.Vnode) {
-
+	// Get keys in range
 	keys := fidias.keysToTransfer(dst.Id)
 	if len(keys) < 1 {
 		return
 	}
 
+	// Transfer keys
 	for key, locID := range keys {
-
 		log.Printf("[DEBUG] Transfer key=%s location-id=%x src=%x dst=%x", key, locID, src.Id, dst.Id)
 		if err := fidias.logtrans.TransferKeylog(dst.Host, []byte(key)); err != nil {
-			log.Println("[ERROR]", err)
+			log.Printf("[ERROR] Failed to transfer key=%s error='%v'", key, err)
 		}
-
 	}
 
 }
@@ -48,7 +50,9 @@ func (fidias *Fidias) keysToTransfer(dstID []byte) map[string][]byte {
 	return keys
 }
 
-func (fidias *Fidias) startRebalancing() {
+func (fidias *Fidias) start() {
+	// Get the heal channel from the log
+	healCh := fidias.hexlog.Heal()
 
 	for {
 
@@ -56,7 +60,14 @@ func (fidias *Fidias) startRebalancing() {
 		case req := <-fidias.rebalanceCh:
 			log.Printf("[INFO] Rebalance %s/%s -> %s/%s",
 				req.Src.Host, req.Src.StringID(), req.Dst.Host, req.Dst.StringID())
+
 			fidias.rebalance(req.Src, req.Dst)
+
+		case req := <-healCh:
+			if _, _, err := fidias.heal(req); err != nil {
+				log.Printf("[ERROR] Failed to heal key=%s height=%d id=%x error='%v'",
+					req.Entry.Key, req.Entry.Height, req.ID, err)
+			}
 
 		case <-fidias.shutdown:
 			return
@@ -64,5 +75,5 @@ func (fidias *Fidias) startRebalancing() {
 		}
 
 	}
-
+	// end
 }

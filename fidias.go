@@ -1,12 +1,21 @@
 package fidias
 
 import (
+	"log"
 	"time"
 
+	"google.golang.org/grpc"
+
+	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
-	"google.golang.org/grpc"
 )
+
+// ReMeta contains metadata associated to a request or response
+type ReMeta struct {
+	Vnode   *chord.Vnode         // vnode processing the request or response
+	PeerSet hexaring.LocationSet // set of peers involved
+}
 
 // Config hold the guac config along with the underlying log and ring config
 type Config struct {
@@ -37,10 +46,11 @@ func DefaultConfig(hostname string) *Config {
 // rebalancing, replication, and appropriately deals with cluster churn.
 type Fidias struct {
 	conf        *Config
+	ring        *hexaring.Ring // Underlying chord ring
+	trans       *localTransport
 	logstore    hexalog.LogStore       // Key based log store
 	logtrans    *hexalog.NetTransport  // Log transport
 	hexlog      *hexalog.Hexalog       // Overall log manager
-	ring        *hexaring.Ring         // Underlying chord ring
 	rebalanceCh chan *RebalanceRequest // Rebalance request channel i.e transfer/takeover
 	shutdown    chan struct{}          // Channel to signal shutdown
 }
@@ -60,6 +70,8 @@ func New(conf *Config, appFSM hexalog.FSM, logStore hexalog.LogStore, stableStor
 	// Init hexalog transport and register with gRPC
 	g.logtrans = hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
 	hexalog.RegisterHexalogRPCServer(server, g.logtrans)
+
+	g.trans = &localTransport{host: conf.Hostname(), local: logStore, remote: g.logtrans}
 
 	// Init hexalog with guac as the FSM
 	var fsm hexalog.FSM
@@ -88,18 +100,57 @@ func (fidias *Fidias) NewEntry(key []byte) *hexalog.Entry {
 // registration, the rebalancing is started.
 func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
-	go fidias.startRebalancing()
+	go fidias.start()
 }
 
 // ProposeEntry finds locations for the entry and submits a new proposal to those
 // locations.
-func (fidias *Fidias) ProposeEntry(entry *hexalog.Entry) (*hexalog.Ballot, error) {
+func (fidias *Fidias) ProposeEntry(entry *hexalog.Entry) (*hexalog.Ballot, *ReMeta, error) {
 	// Lookup locations for this key
 	locs, err := fidias.ring.LookupReplicated(entry.Key, fidias.conf.Replicas)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	opts := &hexalog.RequestOptions{PeerSet: locs}
-	return fidias.hexlog.Propose(entry, opts)
+	ballot, err := fidias.hexlog.Propose(entry, opts)
+	return ballot, &ReMeta{PeerSet: hexaring.LocationSet(locs)}, err
+}
+
+// GetEntry gets any entry from the ring up to the max number of successors.
+func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMeta, err error) {
+	_, vns, err := fidias.ring.Lookup(fidias.conf.Ring.NumSuccessors, key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meta = &ReMeta{}
+	// Try the primary first
+	log.Printf("Trying key=%s id=%x host=%s", key, id, vns[0].Host)
+	entry, err = fidias.trans.GetEntry(vns[0].Host, key, id)
+	if err == nil {
+		meta.Vnode = vns[0]
+		return
+	}
+
+	tried := map[string]bool{vns[0].Host: true}
+
+	// Try the remaining vnode successors
+	for _, vn := range vns[1:] {
+		if _, ok := tried[vn.Host]; ok {
+			continue
+		}
+		tried[vn.Host] = true
+
+		log.Printf("Trying key=%s id=%x host=%s", key, id, vn.Host)
+		entry, err = fidias.trans.GetEntry(vn.Host, key, id)
+		if err == nil {
+			meta.Vnode = vn
+			return
+		}
+
+	}
+
+	err = hexalog.ErrEntryNotFound
+	return
 }
