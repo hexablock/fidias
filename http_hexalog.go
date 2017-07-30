@@ -56,6 +56,7 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
+				headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
 			}
 		} else if strings.Contains(err.Error(), "not in peer set") {
 			// Redirect to the natural key holder

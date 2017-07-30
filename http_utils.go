@@ -5,17 +5,31 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/hexablock/go-chord"
+	"github.com/hexablock/hexaring"
 )
 
 const contentTypeTextPlain = "text/plain"
+
+// headerLocations is the header key for locations
+const headerLocations = "Location-Set"
 
 // statusCodeRedirect will keep the data for the call
 const statusCodeRedirect = 307
 
 var accessControlHeaders = map[string]string{
 	"Access-Control-Allow-Origin": "*",
+}
+
+// locationSetHeader returns the Location-Set header value
+func locationSetHeaderVals(peerSet hexaring.LocationSet) string {
+	h := make([]string, len(peerSet))
+	for i, p := range peerSet {
+		h[i] = fmt.Sprintf("%s/%x", p.Vnode.Host, p.Vnode.Id)
+	}
+	return strings.Join(h, ",")
 }
 
 // generateRedirect generates the redirect url based on the given vnode

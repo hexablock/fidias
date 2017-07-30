@@ -30,7 +30,7 @@ var (
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
 	showVersion   = flag.Bool("version", false, "Show version")
-	debug         = flag.Bool("debug", false, "Turn no debug mode")
+	debug         = flag.Bool("debug", false, "Turn on debug mode")
 )
 
 func printStartBanner(conf *fidias.Config) {

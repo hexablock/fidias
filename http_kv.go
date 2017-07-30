@@ -1,14 +1,43 @@
 package fidias
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexaring"
 )
+
+func (server *HTTPServer) handleGet(resourceID string, n int, reqURI string) (code int, data interface{}, err error) {
+	var (
+		key  = []byte(resourceID)
+		locs hexaring.LocationSet
+	)
+
+	if locs, err = server.fidias.ring.LookupReplicated(key, n); err != nil {
+		return
+	}
+
+	// Check if host is part of the location set otherwise re-direct to the natural vnode
+	if _, err = locs.GetByHost(server.fidias.conf.Hostname()); err != nil {
+		if data, err = generateRedirect(locs[0].Vnode, reqURI); err == nil {
+			code = statusCodeRedirect
+		}
+		return
+	}
+
+	// Get the value locally or return a 404
+	if val := server.fsm.Get(resourceID); val != nil {
+		data = val
+		code = 200
+	} else {
+		code = 404
+	}
+
+	return
+}
 
 func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = map[string]string{}
@@ -22,27 +51,16 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 
 	switch r.Method {
 	case http.MethodGet:
-		keid := strings.Split(resourceID, "/")
-		// Get specific version of a key by entry id
-		if len(keid) == 2 {
-			var id []byte
-			if id, err = hex.DecodeString(keid[1]); err == nil {
-				key := []byte(keid[0])
-				var entry *hexalog.Entry
-				if entry, _, err = server.fidias.GetEntry(key, id); err != nil {
-					code = 404
-				} else {
-					data = &KeyValueItem{Key: keid[0], Entry: entry, Value: entry.Data[1:]}
-				}
-			}
-		} else {
-			// Get a key
-			if val := server.fsm.Get(resourceID); val != nil {
-				data = val
-			} else {
-				code = 404
-			}
+		var n int
+		n, err = parseIntQueryParam(r, "n")
+		if err != nil {
+			break
 		}
+		if n == 0 {
+			n = server.fidias.conf.Replicas
+		}
+
+		code, data, err = server.handleGet(resourceID, n, r.RequestURI)
 
 	case http.MethodPost:
 		// Append a set operation entry to the log
@@ -63,6 +81,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
+				headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
 			}
 		} else if strings.Contains(err.Error(), "not in peer set") {
 			// Redirect to the natural key holder

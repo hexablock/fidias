@@ -31,7 +31,9 @@ type KeyValueItem struct {
 	Entry *hexalog.Entry
 }
 
-// KeyValueFSM is a hexalog FSM for an in-memory key-value store.
+// KeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the FSM
+// interface and provides a get function to retrieve keys as all write are handled by the
+// FSM
 type KeyValueFSM struct {
 	mu sync.RWMutex
 	m  map[string]*KeyValueItem

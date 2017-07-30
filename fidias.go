@@ -90,17 +90,17 @@ func (fidias *Fidias) Status() interface{} {
 	return fidias.ring.Status()
 }
 
-// NewEntry returns a new Entry for the given key from Hexalog
-func (fidias *Fidias) NewEntry(key []byte) *hexalog.Entry {
-	return fidias.hexlog.New(key)
-}
-
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
 // ring depend on each other and the ring may not be intialized yet.  Only upon ring
 // registration, the rebalancing is started.
 func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
 	go fidias.start()
+}
+
+// NewEntry returns a new Entry for the given key from Hexalog
+func (fidias *Fidias) NewEntry(key []byte) *hexalog.Entry {
+	return fidias.hexlog.New(key)
 }
 
 // ProposeEntry finds locations for the entry and submits a new proposal to those
