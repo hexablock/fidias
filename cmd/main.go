@@ -75,7 +75,7 @@ func initHexaring(conf *fidias.Config, peerStore hexaring.PeerStore, server *grp
 		addPeersToStore(peerStore, *retryJoinAddr)
 		ring, err = hexaring.RetryJoin(conf.Ring, peerStore, server)
 	} else {
-		ring, err = hexaring.Create(conf.Ring, server)
+		ring, err = hexaring.Create(conf.Ring, peerStore, server)
 	}
 
 	return ring, err
