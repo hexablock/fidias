@@ -16,6 +16,12 @@ clean:
 $(NAME)d:
 	go build -o $(NAME)d $(SRC_FILES)
 
+deps:
+	go get -d -v ./...
+
+test:
+	go test -v -cover ./...
+
 dist:
 	[ -d dist ] || mkdir dist
 	for os in linux darwin windows; do \
