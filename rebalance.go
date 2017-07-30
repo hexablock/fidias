@@ -26,9 +26,9 @@ func (fidias *Fidias) rebalance(src, dst *chord.Vnode) {
 
 	// Transfer keys
 	for key, locID := range keys {
-		log.Printf("[DEBUG] Transfer key=%s location-id=%x src=%x dst=%x", key, locID, src.Id, dst.Id)
+		log.Printf("[DEBUG] Transfer location-id=%x key=%s src=%x dst=%x", locID, key, src.Id, dst.Id)
 		if err := fidias.logtrans.TransferKeylog(dst.Host, []byte(key)); err != nil {
-			log.Printf("[ERROR] Failed to transfer key=%s error='%v'", key, err)
+			log.Printf("[ERROR] Failed to transfer location-id=%x key=%s error='%v'", locID, key, err)
 		}
 	}
 

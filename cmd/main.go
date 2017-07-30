@@ -25,6 +25,7 @@ var (
 )
 
 var (
+	advAddr       = flag.String("adv-addr", "", "Address to advertise to the network")
 	clusterAddr   = flag.String("cluster-addr", "127.0.0.1:54321", "Cluster bind address")
 	httpAddr      = flag.String("http-addr", "127.0.0.1:9090", "HTTP bind address")
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
@@ -35,26 +36,30 @@ var (
 
 func printStartBanner(conf *fidias.Config) {
 	fmt.Printf(`
-  Cluster : %s
-  Hasher  : %s
-  HTTP    : %s
+  Advertise : %s
+  Cluster   : %s
+  Hasher    : %s
+  HTTP      : %s
 
-`, conf.Hostname(), conf.Hexalog.Hasher.Algorithm(), *httpAddr)
+`, *advAddr, conf.Hostname(), conf.Hexalog.Hasher.Algorithm(), *httpAddr)
 }
 
 func configure(conf *fidias.Config) {
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
+
 	if *debug {
 		// Setup the standard built-in log for underlying libraries
 		baselog.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		baselog.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 		// Setup hexablock/log
 		log.SetLevel(log.LogLevelDebug)
-		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		log.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 
 		// Lower the stabilization time in debug mode
 		conf.Ring.StabilizeMin = 1 * time.Second
 		conf.Ring.StabilizeMax = 3 * time.Second
+	} else {
+		log.SetLevel(log.LogLevelInfo)
 	}
 
 	conf.Ring.Meta["http"] = []byte(*httpAddr)
@@ -96,7 +101,7 @@ func main() {
 	// Server
 	ln, err := net.Listen("tcp", conf.Hostname())
 	if err != nil {
-		log.Fatal("[ERROR]", err)
+		log.Fatalf("[ERROR] Failed start listening on %s: %v", *clusterAddr, err)
 	}
 	gserver := grpc.NewServer()
 
@@ -112,14 +117,14 @@ func main() {
 	// Fidias
 	fids, err := fidias.New(conf, fsm, logStore, stableStore, gserver)
 	if err != nil {
-		log.Fatal("[ERROR]", err)
+		log.Fatal("[ERROR] Failed to initialize fidias:", err)
 	}
 
 	// Start serving network requests as this is needed in order to init hexaring
 	go gserver.Serve(ln)
 
 	// Create or join chord ring
-	log.Println("[INFO] Initializing ring ...")
+	log.Printf("[INFO] Initializing ring bind-address=%s", *clusterAddr)
 	ring, err := initHexaring(conf, peerStore, gserver)
 	if err != nil {
 		log.Fatal("[ERROR]", err)
@@ -129,7 +134,7 @@ func main() {
 	fids.Register(ring)
 
 	// Start HTTP API
-	log.Printf("[INFO] Starting HTTP server ...")
+	log.Printf("[INFO] Starting HTTP server bind-address=%s", *httpAddr)
 	httpServer := fidias.NewHTTPServer("/v1", fsm, logStore, fids)
 	if err = http.ListenAndServe(*httpAddr, httpServer); err != nil {
 		log.Fatal("[ERROR]", err)

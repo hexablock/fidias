@@ -36,7 +36,7 @@ func (conf *Config) Hostname() string {
 func DefaultConfig(hostname string) *Config {
 	return &Config{
 		Replicas:         3,
-		RebalanceBufSize: 16,
+		RebalanceBufSize: 32,
 		Ring:             hexaring.DefaultConfig(hostname),
 		Hexalog:          hexalog.DefaultConfig(hostname),
 	}

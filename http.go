@@ -27,11 +27,11 @@ func NewHTTPServer(apiPrefix string, fsm *KeyValueFSM, logstore hexalog.LogStore
 	}
 	// URL path to handler map
 	s.routes = httpRoutes{
-		"lookup":  s.handleLookup,
-		"locate":  s.handleLocate,
-		"status":  s.handleStatus,
-		"hexalog": s.handleHexalog,
-		"kv":      s.handleKeyValue,
+		"lookup":  s.handleLookup,   // Chord lookups
+		"locate":  s.handleLocate,   // Replicated lookups
+		"status":  s.handleStatus,   // Overall status
+		"hexalog": s.handleHexalog,  // Hexalog interations
+		"kv":      s.handleKeyValue, // Key-value operations
 	}
 
 	return s

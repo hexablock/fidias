@@ -13,17 +13,6 @@ const (
 	opDel
 )
 
-// DummyFSM is a placeholder FSM that does nothing
-type DummyFSM struct{}
-
-// Apply gets called by hexalog each time a new entry has been commit and accepted by the
-// cluster
-func (fsm *DummyFSM) Apply(entry *hexalog.Entry) interface{} {
-	log.Printf("[INFO] DummyFSM key=%s height=%d data='%s'", entry.Key, entry.Height, entry.Data)
-
-	return nil
-}
-
 // KeyValueItem holds the value and the log entry associated to it
 type KeyValueItem struct {
 	Key   string
@@ -53,11 +42,10 @@ func (fsm *KeyValueFSM) Get(key string) *KeyValueItem {
 	return value
 }
 
-// Apply applies the given entry to the KeyValueFSM.  This first byte in the entry data
-// contains the operation to be performed.
-func (fsm *KeyValueFSM) Apply(entry *hexalog.Entry) interface{} {
-	log.Printf("[DEBUG] KeyValueFSM.Apply key=%s height=%d data='%s'", entry.Key, entry.Height, entry.Data)
-
+// Apply applies the given entry to the KeyValueFSM.  entryID is the hash id of the entry.
+// The first byte in entry.Data contains the operation to be performed followed by the
+// actual value.
+func (fsm *KeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil
 	}
@@ -100,5 +88,16 @@ func (fsm *KeyValueFSM) applyDelete(key string) error {
 	}
 
 	delete(fsm.m, key)
+	return nil
+}
+
+// DummyFSM is a placeholder FSM that does nothing
+type DummyFSM struct{}
+
+// Apply gets called by hexalog each time a new entry has been commit and accepted by the
+// cluster
+func (fsm *DummyFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
+	log.Printf("[INFO] DummyFSM key=%s height=%d id=%x data='%s'", entry.Key, entry.Height,
+		entryID, entry.Data)
 	return nil
 }
