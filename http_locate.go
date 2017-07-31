@@ -3,6 +3,7 @@ package fidias
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // handleLocate locates r replicas around the ring.  If r is not provided then it is
@@ -22,8 +23,11 @@ func (server *HTTPServer) handleLocate(w http.ResponseWriter, r *http.Request, r
 			n = server.fidias.conf.Replicas
 		}
 
+		start := time.Now()
 		code = 200
 		data, err = server.fidias.ring.LookupReplicated([]byte(resourceID), n)
+		end := time.Since(start)
+		headers[headerLocateTime] = fmt.Sprintf("%v", end)
 
 	case http.MethodOptions:
 		code = 200

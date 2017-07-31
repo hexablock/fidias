@@ -58,6 +58,8 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 				data = ballot.Future()
 				headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
 			}
+			headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
+
 		} else if strings.Contains(err.Error(), "not in peer set") {
 			// Redirect to the natural key holder
 			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {

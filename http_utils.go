@@ -13,8 +13,14 @@ import (
 
 const contentTypeTextPlain = "text/plain"
 
-// headerLocations is the header key for locations
-const headerLocations = "Location-Set"
+const (
+	// headerLocations is the header key for locations
+	headerLocations = "Location-Set"
+	// headerBallotTime is the header key for the time taken for a ballot
+	headerBallotTime = "Ballot-Time"
+	// headerLocateTime is the header key for the time taken for a locate call
+	headerLocateTime = "Locate-Time"
+)
 
 // statusCodeRedirect will keep the data for the call
 const statusCodeRedirect = 307
