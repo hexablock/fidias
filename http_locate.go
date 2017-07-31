@@ -59,21 +59,3 @@ func (server *HTTPServer) locateOptionsBody(resourceID string) []byte {
 
 `, server.prefix, resourceID, resourceID))
 }
-
-// handleLookup lookups the requested number of successors n.  If n is not provied it is
-// defaulted to the max no. of allowed successorss
-func (server *HTTPServer) handleLookup(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
-
-	var n int
-	if n, err = parseIntQueryParam(r, "n"); err != nil {
-		return
-	}
-	if n == 0 {
-		n = server.fidias.ring.NumSuccessors()
-	}
-
-	code = 200
-	_, data, err = server.fidias.ring.Lookup(n, []byte(resourceID))
-
-	return
-}
