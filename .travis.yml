@@ -6,6 +6,7 @@ install:
 script:
 - make test
 - make clean dist
+before_deploy: "pwd"
 deploy:
   provider: releases
   api_key:
@@ -13,5 +14,4 @@ deploy:
   file_glob: true
   file: "dist/fidiasd-*"
   on:
-    repo: hexablock/fidias
-    tags: true
+    branch: master
