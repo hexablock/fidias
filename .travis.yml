@@ -1,11 +1,19 @@
 language: go
-
 go:
-  - 1.8.1
-
+- 1.8.1
 install:
-  - make deps
-
+- make deps
 script:
-  - make test
-  - make clean dist
+- make test
+- make clean dist
+deploy:
+  provider: releases
+  api_key:
+    secure: krLBtk5se1rHAOHslbQXKPVaUCcYOIHOf3znw73ZU4RluElEQldI9GcVKUmpiY0THfO4B02I/O2h65jm2z+w13oyctEC/IrLHH27aTPjRk6HgqePU7Wds3WxCer+gbvLFv3tdEymc4rTpsHifYocqz6XvyUN5rsnjx5gLrKXhymSllyTSMnW6cXmU+aY1E35fZHdU6BoEY7nFktjguopL+DmJh13ydZjPW2u5SziG6lFzBVHxCG49Oa69PBQayq+w7jdJ9n5uUokJNS34mn6JMYRBF5jIcoxJi6qgQs3WZH9OY5isGvOWPi0MNw5YPLEbKZAdXTN5NGtFgKN2tfrjs723pgRTRpbvG0vSGIKJI/3ZExgVIiFyApUWozQzKRzW+sryApF+/gULKgrPJVSwk1A8SUNZlrmFfD1Np7CXsheZhWy2KMEtw+zo66SO4Ofw4YVTCR6z+dM9xfLRhCcW8oILVoA1FF+kDisZovZlXx3U62Zl2njUF0lEqIhhFruqdD5mIwM4t6n8IT4D1nry0mOm7N5tqg7NMH7PIH+sDZjT+lYZxEXZy8MVioNqQzqh1f2DZ4ni5vVtJPuG1WckhJtW2xjic4ZdZPtmefmaYJk75ID3a0X3SI+mAfI9kc49DR2IE7fIZn3zsWznnLyy8hVFydbA2D3m34AHYWVvTw=
+  file:
+    - dist/fidiasd-linux.tgz
+    - dist/fidiasd-darwin.tgz
+    - dist/fidiasd-windows.zip
+  on:
+    repo: hexablock/fidias
+    tags: true

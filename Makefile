@@ -22,12 +22,17 @@ deps:
 test:
 	go test -v -cover ./...
 
-dist:
-	[ -d dist ] || mkdir dist
-	for os in linux darwin windows; do \
-		GOOS=$${os} $(BUILD_CMD) $(LD_OPTS) -o dist/$(NAME)-$${os} $(SRC_FILES); \
-		tar -C dist -czf dist/$(NAME)-$${os}.tgz $(NAME)-$${os}; \
+# Build all
+dist: dist/$(NAME)d-windows.zip
+	for os in linux darwin; do \
+		GOOS=$${os} $(BUILD_CMD) $(LD_OPTS) -o dist/$(NAME)d-$${os} $(SRC_FILES) && \
+		tar -C dist -czf dist/$(NAME)d-$${os}.tgz $(NAME)d-$${os}; \
 	done;
+
+# Build windows
+dist/$(NAME)d-windows.zip:
+	GOOS=windows $(BUILD_CMD) $(LD_OPTS) -o dist/$(NAME)d.exe $(SRC_FILES) && \
+	cd dist && zip $(NAME)d-windows.zip $(NAME)d.exe
 
 protoc:
 	protoc rpc.proto -I ./ -I ../../../ --go_out=plugins=grpc:.
