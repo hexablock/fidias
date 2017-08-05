@@ -14,7 +14,7 @@ clean:
 
 # Local platform build
 $(NAME)d:
-	go build -o $(NAME)d $(SRC_FILES)
+	go build $(LD_OPTS) -o $(NAME)d $(SRC_FILES)
 
 deps:
 	go get -d -v ./...

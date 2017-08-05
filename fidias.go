@@ -29,8 +29,9 @@ type ReMeta struct {
 type Config struct {
 	Ring             *hexaring.Config
 	Hexalog          *hexalog.Config
-	RebalanceBufSize int // Rebalance request buffer size
-	Replicas         int // Number of replicas for a key
+	RebalanceBufSize int           // Rebalance request buffer size
+	Replicas         int           // Number of replicas for a key
+	StableThreshold  time.Duration // Threshold after ring event to consider we are stable
 }
 
 // Hostname returns the configured hostname. The assumption here is the log and ring
@@ -47,6 +48,7 @@ func DefaultConfig(hostname string) *Config {
 		RebalanceBufSize: 32,
 		Ring:             hexaring.DefaultConfig(hostname),
 		Hexalog:          hexalog.DefaultConfig(hostname),
+		StableThreshold:  5 * time.Minute,
 	}
 }
 

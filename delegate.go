@@ -44,3 +44,9 @@ func (fidias *Fidias) setLastRingEvent() {
 	fidias.lastRingEvent = time.Now()
 	fidias.tmu.Unlock()
 }
+
+func (fidias *Fidias) isStable() bool {
+	fidias.tmu.RLock()
+	defer fidias.tmu.RUnlock()
+	return time.Since(fidias.lastRingEvent) >= fidias.conf.StableThreshold
+}
