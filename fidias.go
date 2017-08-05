@@ -72,7 +72,7 @@ func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStor
 		conf: conf,
 		//logstore:    logStore,
 		rebalanceCh: make(chan *RebalanceRequest, conf.RebalanceBufSize),
-		shutdown:    make(chan struct{}, 1),
+		shutdown:    make(chan struct{}, 2), // healer, rebalancer
 	}
 
 	// Set guac as the chord delegate
@@ -116,7 +116,9 @@ func (fidias *Fidias) Status() interface{} {
 // registration, the rebalancing is started.
 func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
-	go fidias.start()
+
+	go fidias.startHealer()
+	go fidias.startRebalancer()
 }
 
 // NewEntry returns a new Entry for the given key from Hexalog
@@ -188,4 +190,12 @@ func (fidias *Fidias) GetKey(key []byte) (kvp *KeyValuePair, meta *ReMeta, err e
 	}
 
 	return
+}
+
+func (fidias *Fidias) shutdownWait() {
+	close(fidias.rebalanceCh)
+	// wait for shutdown
+	for i := 0; i < 2; i++ {
+		<-fidias.shutdown
+	}
 }

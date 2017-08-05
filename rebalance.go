@@ -50,30 +50,12 @@ func (fidias *Fidias) keysToTransfer(dstID []byte) map[string][]byte {
 	return keys
 }
 
-func (fidias *Fidias) start() {
-	// Get the heal channel from the log
-	healCh := fidias.hexlog.Heal()
+func (fidias *Fidias) startRebalancer() {
 
-	for {
-
-		select {
-		case req := <-fidias.rebalanceCh:
-			log.Printf("[INFO] Rebalance %s/%s -> %s/%s",
-				req.Src.Host, req.Src.StringID(), req.Dst.Host, req.Dst.StringID())
-
-			fidias.rebalance(req.Src, req.Dst)
-
-		case req := <-healCh:
-			if _, _, err := fidias.heal(req); err != nil {
-				log.Printf("[ERROR] Failed to heal key=%s height=%d id=%x error='%v'",
-					req.Entry.Key, req.Entry.Height, req.ID, err)
-			}
-
-		case <-fidias.shutdown:
-			return
-
-		}
-
+	for req := range fidias.rebalanceCh {
+		log.Printf("[INFO] Rebalance %s/%s -> %s/%s", req.Src.Host, req.Src.StringID(), req.Dst.Host, req.Dst.StringID())
+		fidias.rebalance(req.Src, req.Dst)
 	}
-	// end
+
+	fidias.shutdown <- struct{}{}
 }
