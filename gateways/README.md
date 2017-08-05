@@ -10,8 +10,7 @@ This endpoint allows to perform key-value pair operations.
 | Method   | Body | Description |
 |----------|------|-------------|
 | GET      |      | Get a key |
-| POST/PUT | Any data as the value | Create a key |
-| PATCH    | Any data as the value | Update an existing key |
+| POST/PUT | Any data as the value | Set a key |
 | DELETE   |      | Delete a key |
 
 #### /v1/lookup/*{ key }*

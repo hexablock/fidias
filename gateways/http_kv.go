@@ -71,7 +71,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 
 		code, data, err = server.handleGet(resourceID, n, r.RequestURI)
 
-	case http.MethodPost:
+	case http.MethodPost, http.MethodPut:
 		// Append a set operation entry to the log
 		var b []byte
 		if b, err = ioutil.ReadAll(r.Body); err != nil {
