@@ -1,10 +1,12 @@
 NAME = fidias
-VERSION = 0.0.0
+
 COMMIT = $(shell git rev-parse --short HEAD)
+
+VERSION = $(shell git describe 2> /dev/null || echo "0.0.0-$(COMMIT)")
 BUILDTIME = $(shell date +%Y-%m-%dT%T%z)
 
 BUILD_CMD = CGO_ENABLED=0 go build -a -tags netgo -installsuffix netgo
-LD_OPTS = -ldflags="-X main.version=$(VERSION)-$(COMMIT) -X main.buildtime=$(BUILDTIME) -w"
+LD_OPTS = -ldflags="-X main.version=$(VERSION) -X main.buildtime=$(BUILDTIME) -w"
 SRC_FILES = ./cmd/*.go
 
 clean:
