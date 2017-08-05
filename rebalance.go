@@ -27,7 +27,7 @@ func (fidias *Fidias) rebalance(src, dst *chord.Vnode) {
 	// Transfer keys
 	for key, locID := range keys {
 		log.Printf("[DEBUG] Transfer location-id=%x key=%s src=%x dst=%x", locID, key, src.Id, dst.Id)
-		if err := fidias.logtrans.TransferKeylog(dst.Host, []byte(key)); err != nil {
+		if err := fidias.trans.remote.TransferKeylog(dst.Host, []byte(key)); err != nil {
 			log.Printf("[ERROR] Failed to transfer location-id=%x key=%s error='%v'", locID, key, err)
 		}
 	}
@@ -40,7 +40,7 @@ func (fidias *Fidias) keysToTransfer(dstID []byte) map[string][]byte {
 	keys := map[string][]byte{}
 
 	// Iterate through and get all keys and locations that are less than the destination
-	fidias.logstore.Iter(func(key string, locationID []byte) {
+	fidias.trans.local.Iter(func(key string, locationID []byte) {
 		// Grab all locations less than the destination
 		if bytes.Compare(locationID, dstID) <= 0 {
 			keys[key] = locationID

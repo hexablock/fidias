@@ -46,6 +46,10 @@ func (server *HTTPServer) handleGet(resourceID string, n int, reqURI string) (co
 func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = map[string]string{}
 
+	//
+	// TODO: make following redirects a user controllable option
+	//
+
 	if resourceID == "" {
 		code = 404
 		return
@@ -90,12 +94,26 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 			headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
 
 		} else if strings.Contains(err.Error(), "not in peer set") {
-
-			// Redirect to the natural key holder
-			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
-				code = statusCodeRedirect
+			// Redirect to the next location after us.
+			var next *hexaring.Location
+			if next, err = meta.PeerSet.GetNext(server.fidias.conf.Hostname()); err == nil {
+				if data, err = generateRedirect(next.Vnode, r.RequestURI); err == nil {
+					code = statusCodeRedirect
+				}
+			} else {
+				// If the above fails redirect to the natural key
+				if strings.Contains(err.Error(), "host not in set") {
+					// Redirect to the natural key holder
+					if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
+						code = statusCodeRedirect
+					}
+				}
 			}
-
+			//
+			// TODO:
+			// During high churn you may reach the max redirect limit.  This may need to
+			// be addressed
+			//
 		}
 
 	case http.MethodDelete:

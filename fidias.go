@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"io"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -52,14 +53,14 @@ func DefaultConfig(hostname string) *Config {
 // Fidias is the core that manages all operations for a node.  It primary manages
 // rebalancing, replication, and appropriately deals with cluster churn.
 type Fidias struct {
-	conf *Config
-	ring *hexaring.Ring // Underlying chord ring
+	conf          *Config
+	ring          *hexaring.Ring // Underlying chord ring
+	tmu           sync.RWMutex   // Ring event time lock
+	lastRingEvent time.Time      // Last time there was a ring membership change
 
 	trans *localTransport // Transport to handle local and remote calls
 
-	logstore hexalog.LogStore      // Key based log store
-	logtrans *hexalog.NetTransport // Log network transport
-	hexlog   *hexalog.Hexalog      // Overall log manager
+	hexlog *hexalog.Hexalog // Overall log manager
 
 	rebalanceCh chan *RebalanceRequest // Rebalance request channel i.e transfer/takeover
 	shutdown    chan struct{}          // Channel to signal shutdown
@@ -68,8 +69,8 @@ type Fidias struct {
 // New instantiates a new instance of Fidias based on the given config
 func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
 	g = &Fidias{
-		conf:        conf,
-		logstore:    logStore,
+		conf: conf,
+		//logstore:    logStore,
 		rebalanceCh: make(chan *RebalanceRequest, conf.RebalanceBufSize),
 		shutdown:    make(chan struct{}, 1),
 	}
@@ -78,10 +79,10 @@ func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStor
 	conf.Ring.Delegate = g
 
 	// Init hexalog transport and register with gRPC
-	g.logtrans = hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
-	hexalog.RegisterHexalogRPCServer(server, g.logtrans)
+	logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
+	hexalog.RegisterHexalogRPCServer(server, logtrans)
 
-	// Init hexalog with guac as the FSM
+	// Init the FSM
 	var fsm KeyValueFSM
 	if appFSM == nil {
 		fsm = &DummyFSM{}
@@ -93,14 +94,14 @@ func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStor
 	g.trans = &localTransport{
 		host:     conf.Hostname(),
 		local:    logStore,
-		remote:   g.logtrans,
+		remote:   logtrans,
 		kvlocal:  fsm,
 		kvremote: kvremote,
 	}
-	// Register kv rpc
+	// Register key-value rpc
 	RegisterFidiasRPCServer(server, kvremote)
 
-	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, g.logtrans)
+	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, logtrans)
 
 	return
 }

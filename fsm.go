@@ -18,13 +18,6 @@ var (
 	errKeyNotFound = errors.New("key not found")
 )
 
-// KeyValuePair holds the value and the log entry associated to it
-// type KeyValuePair struct {
-// 	Key   string
-// 	Value []byte
-// 	Entry *hexalog.Entry
-// }
-
 // InMemKeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the FSM
 // interface and provides a get function to retrieve keys as all write are handled by the
 // FSM

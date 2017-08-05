@@ -17,9 +17,10 @@ func (fidias *Fidias) heal(req *hexalog.RPCRequest) (*hexalog.FutureEntry, *ReMe
 	// submitter location
 	// loc := opts.SourcePeer()
 
-	keylog, err := fidias.logstore.GetKey(e.Key)
+	// Get local key log
+	keylog, err := fidias.trans.local.GetKey(e.Key)
 	if err != nil {
-		if keylog, err = fidias.logstore.NewKey(e.Key, selfLoc.ID); err != nil {
+		if keylog, err = fidias.trans.local.NewKey(e.Key, selfLoc.ID); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -55,7 +56,7 @@ func (fidias *Fidias) heal(req *hexalog.RPCRequest) (*hexalog.FutureEntry, *ReMe
 				last = &hexalog.Entry{Key: e.Key}
 			}
 
-			_, err = fidias.logtrans.FetchKeylog(vn.Host, last)
+			_, err = fidias.trans.remote.FetchKeylog(vn.Host, last)
 			if err != nil {
 				log.Printf("[ERROR] key=%s vnode=%s/%x %v", e.Key, vn.Host, vn.Id, err)
 				continue
