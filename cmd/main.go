@@ -37,12 +37,13 @@ var (
 
 func printStartBanner(conf *fidias.Config) {
 	fmt.Printf(`
+  Version   : %s
   Advertise : %s
   Cluster   : %s
   Hasher    : %s
   HTTP      : %s
 
-`, *advAddr, conf.Hostname(), conf.Hexalog.Hasher.Algorithm(), *httpAddr)
+`, version, *advAddr, conf.Hostname(), conf.Hexalog.Hasher.Algorithm(), *httpAddr)
 }
 
 func configure(conf *fidias.Config) {
