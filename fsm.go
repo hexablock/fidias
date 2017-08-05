@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	opSet byte = iota + 1
-	opDel
+	// OpSet is the op to set a ke-value pair
+	OpSet byte = iota + 1
+	// OpDel is the op to delete a key-value pair
+	OpDel
 )
 
 var (
@@ -57,10 +59,10 @@ func (fsm *InMemKeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interfa
 	)
 
 	switch op {
-	case opSet:
+	case OpSet:
 		resp = fsm.applySet(entry.Key, entry.Data[1:], entry)
 
-	case opDel:
+	case OpDel:
 		resp = fsm.applyDelete(string(entry.Key))
 
 	default:

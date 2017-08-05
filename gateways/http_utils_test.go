@@ -1,4 +1,4 @@
-package fidias
+package gateways
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/hexablock/fidias"
 	chord "github.com/hexablock/go-chord"
 )
 
@@ -29,7 +30,7 @@ func Test_parseIntQueryParam(t *testing.T) {
 func Test_writeJSONResponse_data(t *testing.T) {
 	w := httptest.NewRecorder()
 	headers := map[string]string{"test": "value"}
-	data := &KeyValuePair{Key: []byte("foo")}
+	data := &fidias.KeyValuePair{Key: []byte("foo")}
 	writeJSONResponse(w, 200, headers, data, nil)
 
 	resp := w.Result()
@@ -70,7 +71,7 @@ func Test_generateRedirect(t *testing.T) {
 func Test_writeJSONResponse_error(t *testing.T) {
 	w := httptest.NewRecorder()
 	headers := map[string]string{}
-	data := &KeyValuePair{Key: []byte("foo")}
+	data := &fidias.KeyValuePair{Key: []byte("foo")}
 	err := fmt.Errorf("foo")
 	writeJSONResponse(w, 200, headers, data, err)
 

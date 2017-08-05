@@ -1,29 +1,36 @@
-package fidias
+package gateways
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexaring"
 )
 
 // HTTPServer serves all http requests that guac supports
 type HTTPServer struct {
-	prefix   string     // api version prefix
-	routes   httpRoutes // Registerd routes
-	fidias   *Fidias
-	fsm      KeyValueFSM
+	prefix string     // api version prefix
+	routes httpRoutes // Registerd routes
+
+	conf     *fidias.Config
+	ring     *hexaring.Ring
+	fids     *fidias.Fidias
+	fsm      fidias.KeyValueFSM
 	logstore hexalog.LogStore
 }
 
 // NewHTTPServer instantiates a new Guac HTTP API server
-func NewHTTPServer(apiPrefix string, fsm KeyValueFSM, logstore hexalog.LogStore, fidias *Fidias) *HTTPServer {
+func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, fsm fidias.KeyValueFSM, logstore hexalog.LogStore, fids *fidias.Fidias) *HTTPServer {
 	s := &HTTPServer{
 		prefix:   apiPrefix,
+		conf:     conf,
+		ring:     ring,
 		fsm:      fsm,
 		logstore: logstore,
-		fidias:   fidias,
+		fids:     fids,
 	}
 	// URL path to handler map
 	s.routes = httpRoutes{
@@ -62,7 +69,7 @@ func (server *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request, r
 	switch r.Method {
 	case http.MethodGet:
 		code = 200
-		data = server.fidias.Status()
+		data = server.fids.Status()
 	case http.MethodOptions:
 		code = 200
 		data = server.statusOptionsBody(resourceID)
@@ -96,11 +103,11 @@ func (server *HTTPServer) handleLookup(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	if n == 0 {
-		n = server.fidias.ring.NumSuccessors()
+		n = server.ring.NumSuccessors()
 	}
 
 	code = 200
-	_, data, err = server.fidias.ring.Lookup(n, []byte(resourceID))
+	_, data, err = server.ring.Lookup(n, []byte(resourceID))
 
 	return
 }

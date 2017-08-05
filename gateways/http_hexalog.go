@@ -1,4 +1,4 @@
-package fidias
+package gateways
 
 import (
 	"encoding/hex"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
 )
 
@@ -29,8 +30,8 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 			var id []byte
 			if id, err = hex.DecodeString(keid[1]); err == nil {
 				key := []byte(keid[0])
-				meta := &ReMeta{}
-				if data, meta, err = server.fidias.GetEntry(key, id); err != nil {
+				meta := &fidias.ReMeta{}
+				if data, meta, err = server.fids.GetEntry(key, id); err != nil {
 					code = 404
 				} else {
 					headers[headerLocations] = fmt.Sprintf("%s/%x", meta.Vnode.Host, meta.Vnode.Id)
@@ -49,14 +50,14 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 		}
 		defer r.Body.Close()
 
-		entry := server.fidias.NewEntry([]byte(resourceID))
+		entry := server.fids.NewEntry([]byte(resourceID))
 		entry.Data = b
 
 		var (
 			ballot *hexalog.Ballot
-			meta   *ReMeta
+			meta   *fidias.ReMeta
 		)
-		if ballot, meta, err = server.fidias.ProposeEntry(entry); err == nil {
+		if ballot, meta, err = server.fids.ProposeEntry(entry); err == nil {
 			if err = ballot.Wait(); err == nil {
 				data = ballot.Future()
 				headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
@@ -71,32 +72,9 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 
 		}
 
-	case http.MethodOptions:
-		headers["Content-Type"] = contentTypeTextPlain
-		data = server.hexalogOptionsBody(resourceID)
-
 	default:
 		code = 405
 	}
 
 	return
-}
-
-func (server *HTTPServer) hexalogOptionsBody(resourceID string) []byte {
-	return []byte(fmt.Sprintf(`
-  %s/hexalog/%s
-
-  Endpoint to perform direct hexalog entry operations
-
-  Methods:
-
-    GET      Retrieve the key log for key: '%s'
-    POST     Append an entry to the key log for key: '%s'
-    OPTIONS  Information about the endpoint
-
-  Body:
-
-    Key log entry data
-
-`, server.prefix, resourceID, resourceID, resourceID))
 }

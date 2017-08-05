@@ -1,4 +1,4 @@
-package fidias
+package gateways
 
 import "net/http"
 

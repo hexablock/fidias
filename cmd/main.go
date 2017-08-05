@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/hexablock/fidias"
+	"github.com/hexablock/fidias/gateways"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
@@ -45,7 +46,7 @@ func printStartBanner(conf *fidias.Config) {
 }
 
 func configure(conf *fidias.Config) {
-	log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
+	conf.Ring.Meta["http"] = []byte(*httpAddr)
 
 	if *debug {
 		// Setup the standard built-in log for underlying libraries
@@ -59,23 +60,27 @@ func configure(conf *fidias.Config) {
 		conf.Ring.StabilizeMin = 1 * time.Second
 		conf.Ring.StabilizeMax = 3 * time.Second
 	} else {
+		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetLevel(log.LogLevelInfo)
 	}
-
-	conf.Ring.Meta["http"] = []byte(*httpAddr)
 
 	printStartBanner(conf)
 }
 
 func initHexaring(conf *fidias.Config, peerStore hexaring.PeerStore, server *grpc.Server) (ring *hexaring.Ring, err error) {
-	if *joinAddr != "" {
+	switch {
+
+	case *joinAddr != "":
 		addPeersToStore(peerStore, *joinAddr)
 		ring, err = hexaring.Join(conf.Ring, peerStore, server)
-	} else if *retryJoinAddr != "" {
+
+	case *retryJoinAddr != "":
 		addPeersToStore(peerStore, *retryJoinAddr)
 		ring, err = hexaring.RetryJoin(conf.Ring, peerStore, server)
-	} else {
+
+	default:
 		ring, err = hexaring.Create(conf.Ring, peerStore, server)
+
 	}
 
 	return ring, err
@@ -94,12 +99,17 @@ func main() {
 		return
 	}
 
+	if *advAddr == "" {
+		// TODO: check it is a valid advertiseable address
+		advAddr = clusterAddr
+	}
+
 	// Configuration
-	conf := fidias.DefaultConfig(*clusterAddr)
+	conf := fidias.DefaultConfig(*advAddr)
 	configure(conf)
 
 	// Server
-	ln, err := net.Listen("tcp", conf.Hostname())
+	ln, err := net.Listen("tcp", *clusterAddr)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed start listening on %s: %v", *clusterAddr, err)
 	}
@@ -135,7 +145,7 @@ func main() {
 
 	// Start HTTP API
 	log.Printf("[INFO] Starting HTTP server bind-address=%s", *httpAddr)
-	httpServer := fidias.NewHTTPServer("/v1", fsm, logStore, fids)
+	httpServer := gateways.NewHTTPServer("/v1", conf, ring, fsm, logStore, fids)
 	if err = http.ListenAndServe(*httpAddr, httpServer); err != nil {
 		log.Fatal("[ERROR]", err)
 	}
