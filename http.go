@@ -13,12 +13,12 @@ type HTTPServer struct {
 	prefix   string     // api version prefix
 	routes   httpRoutes // Registerd routes
 	fidias   *Fidias
-	fsm      *KeyValueFSM
+	fsm      KeyValueFSM
 	logstore hexalog.LogStore
 }
 
 // NewHTTPServer instantiates a new Guac HTTP API server
-func NewHTTPServer(apiPrefix string, fsm *KeyValueFSM, logstore hexalog.LogStore, fidias *Fidias) *HTTPServer {
+func NewHTTPServer(apiPrefix string, fsm KeyValueFSM, logstore hexalog.LogStore, fidias *Fidias) *HTTPServer {
 	s := &HTTPServer{
 		prefix:   apiPrefix,
 		fsm:      fsm,

@@ -29,4 +29,7 @@ dist:
 		tar -C dist -czf dist/$(NAME)-$${os}.tgz $(NAME)-$${os}; \
 	done;
 
+protoc:
+	protoc rpc.proto -I ./ -I ../../../ --go_out=plugins=grpc:.
+
 all: $(NAME)d

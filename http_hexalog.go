@@ -29,8 +29,11 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 			var id []byte
 			if id, err = hex.DecodeString(keid[1]); err == nil {
 				key := []byte(keid[0])
-				if data, _, err = server.fidias.GetEntry(key, id); err != nil {
+				meta := &ReMeta{}
+				if data, meta, err = server.fidias.GetEntry(key, id); err != nil {
 					code = 404
+				} else {
+					headers[headerLocations] = fmt.Sprintf("%s/%x", meta.Vnode.Host, meta.Vnode.Id)
 				}
 			}
 		} else {

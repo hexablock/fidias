@@ -1,7 +1,7 @@
 package fidias
 
 import (
-	"log"
+	"io"
 	"time"
 
 	"google.golang.org/grpc"
@@ -10,6 +10,13 @@ import (
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 )
+
+// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
+// contains key-value functions needed.
+type KeyValueFSM interface {
+	hexalog.FSM
+	Get(key []byte) (*KeyValuePair, error)
+}
 
 // ReMeta contains metadata associated to a request or response
 type ReMeta struct {
@@ -21,7 +28,7 @@ type ReMeta struct {
 type Config struct {
 	Ring             *hexaring.Config
 	Hexalog          *hexalog.Config
-	RebalanceBufSize int // rebalance request buffer size
+	RebalanceBufSize int // Rebalance request buffer size
 	Replicas         int // Number of replicas for a key
 }
 
@@ -45,18 +52,21 @@ func DefaultConfig(hostname string) *Config {
 // Fidias is the core that manages all operations for a node.  It primary manages
 // rebalancing, replication, and appropriately deals with cluster churn.
 type Fidias struct {
-	conf        *Config
-	ring        *hexaring.Ring // Underlying chord ring
-	trans       *localTransport
-	logstore    hexalog.LogStore       // Key based log store
-	logtrans    *hexalog.NetTransport  // Log transport
-	hexlog      *hexalog.Hexalog       // Overall log manager
+	conf *Config
+	ring *hexaring.Ring // Underlying chord ring
+
+	trans *localTransport // Transport to handle local and remote calls
+
+	logstore hexalog.LogStore      // Key based log store
+	logtrans *hexalog.NetTransport // Log network transport
+	hexlog   *hexalog.Hexalog      // Overall log manager
+
 	rebalanceCh chan *RebalanceRequest // Rebalance request channel i.e transfer/takeover
 	shutdown    chan struct{}          // Channel to signal shutdown
 }
 
 // New instantiates a new instance of Fidias based on the given config
-func New(conf *Config, appFSM hexalog.FSM, logStore hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
+func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
 	g = &Fidias{
 		conf:        conf,
 		logstore:    logStore,
@@ -71,15 +81,25 @@ func New(conf *Config, appFSM hexalog.FSM, logStore hexalog.LogStore, stableStor
 	g.logtrans = hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
 	hexalog.RegisterHexalogRPCServer(server, g.logtrans)
 
-	g.trans = &localTransport{host: conf.Hostname(), local: logStore, remote: g.logtrans}
-
 	// Init hexalog with guac as the FSM
-	var fsm hexalog.FSM
+	var fsm KeyValueFSM
 	if appFSM == nil {
 		fsm = &DummyFSM{}
 	} else {
 		fsm = appFSM
 	}
+
+	kvremote := &NetTransport{kvs: fsm}
+	g.trans = &localTransport{
+		host:     conf.Hostname(),
+		local:    logStore,
+		remote:   g.logtrans,
+		kvlocal:  fsm,
+		kvremote: kvremote,
+	}
+	// Register kv rpc
+	RegisterFidiasRPCServer(server, kvremote)
+
 	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, g.logtrans)
 
 	return
@@ -117,40 +137,54 @@ func (fidias *Fidias) ProposeEntry(entry *hexalog.Entry) (*hexalog.Ballot, *ReMe
 	return ballot, &ReMeta{PeerSet: hexaring.LocationSet(locs)}, err
 }
 
-// GetEntry gets any entry from the ring up to the max number of successors.
+// GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
+// upto the max allowed successors for each location.
 func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMeta, err error) {
-	_, vns, err := fidias.ring.Lookup(fidias.conf.Ring.NumSuccessors, key)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	meta = &ReMeta{}
-	// Try the primary first
-	log.Printf("Trying key=%s id=%x host=%s", key, id, vns[0].Host)
-	entry, err = fidias.trans.GetEntry(vns[0].Host, key, id)
-	if err == nil {
-		meta.Vnode = vns[0]
-		return
-	}
-
-	tried := map[string]bool{vns[0].Host: true}
-
-	// Try the remaining vnode successors
-	for _, vn := range vns[1:] {
-		if _, ok := tried[vn.Host]; ok {
-			continue
-		}
-		tried[vn.Host] = true
-
-		log.Printf("Trying key=%s id=%x host=%s", key, id, vn.Host)
-		entry, err = fidias.trans.GetEntry(vn.Host, key, id)
-		if err == nil {
+	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
+		ent, er := fidias.trans.GetEntry(vn.Host, key, id)
+		if er == nil {
+			entry = ent
 			meta.Vnode = vn
-			return
+			return io.EOF
 		}
 
+		return nil
+	})
+
+	// We found the entry.
+	if err == io.EOF {
+		err = nil
+	} else if entry == nil {
+		err = hexalog.ErrEntryNotFound
 	}
 
-	err = hexalog.ErrEntryNotFound
+	return
+}
+
+// GetKey tries to get a key-value pair from the ring.  This is not be confused with the
+// log key.  It orbits the ring to return the first occurence of the key-value pair.
+func (fidias *Fidias) GetKey(key []byte) (kvp *KeyValuePair, meta *ReMeta, err error) {
+	meta = &ReMeta{}
+
+	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
+		kv, er := fidias.trans.GetKey(vn.Host, key)
+		if er == nil {
+			kvp = kv
+			meta.Vnode = vn
+			// We found the entry so we return an EOF
+			return io.EOF
+		}
+
+		return nil
+	})
+
+	// We found the entry.
+	if err == io.EOF {
+		err = nil
+	} else if kvp == nil {
+		err = errKeyNotFound
+	}
+
 	return
 }

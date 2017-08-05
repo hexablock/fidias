@@ -20,20 +20,24 @@ func (server *HTTPServer) handleGet(resourceID string, n int, reqURI string) (co
 		return
 	}
 
+	host := server.fidias.conf.Hostname()
+
 	// Check if host is part of the location set otherwise re-direct to the natural vnode
-	if _, err = locs.GetByHost(server.fidias.conf.Hostname()); err != nil {
+	//var loc *hexaring.Location
+	if _, err = locs.GetByHost(host); err != nil {
 		if data, err = generateRedirect(locs[0].Vnode, reqURI); err == nil {
 			code = statusCodeRedirect
 		}
 		return
 	}
 
-	// Get the value locally or return a 404
-	if val := server.fsm.Get(resourceID); val != nil {
-		data = val
+	data, _, err = server.fidias.GetKey(key)
+	if err == nil {
 		code = 200
 	} else {
-		code = 404
+		if strings.Contains(err.Error(), "not found") {
+			code = 404
+		}
 	}
 
 	return
@@ -86,6 +90,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 			headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
 
 		} else if strings.Contains(err.Error(), "not in peer set") {
+
 			// Redirect to the natural key holder
 			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
 				code = statusCodeRedirect
@@ -108,16 +113,18 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 				data = ballot.Future()
 			}
 		} else if strings.Contains(err.Error(), "not in peer set") {
+
 			// Redirect to the natural key holder
 			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
 				code = statusCodeRedirect
 			}
+
 		}
 
-	case http.MethodOptions:
-		code = 200
-		headers["Content-Type"] = contentTypeTextPlain
-		data = server.kvOptionsBody(resourceID)
+	// case http.MethodOptions:
+	// 	code = 200
+	// 	headers["Content-Type"] = contentTypeTextPlain
+	// 	data = server.kvOptionsBody(resourceID)
 
 	default:
 		code = 405
@@ -126,22 +133,22 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 	return
 }
 
-func (server *HTTPServer) kvOptionsBody(resourceID string) []byte {
-	return []byte(fmt.Sprintf(`
-  %s/kv/%s
-
-  Endpoint to perform key-value operations
-
-  Methods:
-
-    GET      Return value for key: '%s'
-    POST     Create or update key: '%s'
-    DELETE   Delete key: '%s'
-    OPTIONS  Information about the endpoint
-
-  Body:
-
-    Arbitrary data associated to the key
-
-`, server.prefix, resourceID, resourceID, resourceID, resourceID))
-}
+// func (server *HTTPServer) kvOptionsBody(resourceID string) []byte {
+// 	return []byte(fmt.Sprintf(`
+//   %s/kv/%s
+//
+//   Endpoint to perform key-value operations
+//
+//   Methods:
+//
+//     GET      Return value for key: '%s'
+//     POST     Create or update key: '%s'
+//     DELETE   Delete key: '%s'
+//     OPTIONS  Information about the endpoint
+//
+//   Body:
+//
+//     Arbitrary data associated to the key
+//
+// `, server.prefix, resourceID, resourceID, resourceID, resourceID))
+// }

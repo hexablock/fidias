@@ -112,7 +112,7 @@ func main() {
 	peerStore := hexaring.NewInMemPeerStore()
 
 	// Application FSM
-	fsm := fidias.NewKeyValueFSM()
+	fsm := fidias.NewInMemKeyValueFSM()
 
 	// Fidias
 	fids, err := fidias.New(conf, fsm, logStore, stableStore, gserver)

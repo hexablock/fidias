@@ -1,6 +1,7 @@
 package fidias
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -13,39 +14,46 @@ const (
 	opDel
 )
 
-// KeyValueItem holds the value and the log entry associated to it
-type KeyValueItem struct {
-	Key   string
-	Value []byte
-	Entry *hexalog.Entry
-}
+var (
+	errKeyNotFound = errors.New("key not found")
+)
 
-// KeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the FSM
+// KeyValuePair holds the value and the log entry associated to it
+// type KeyValuePair struct {
+// 	Key   string
+// 	Value []byte
+// 	Entry *hexalog.Entry
+// }
+
+// InMemKeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the FSM
 // interface and provides a get function to retrieve keys as all write are handled by the
 // FSM
-type KeyValueFSM struct {
+type InMemKeyValueFSM struct {
 	mu sync.RWMutex
-	m  map[string]*KeyValueItem
+	m  map[string]*KeyValuePair
 }
 
-// NewKeyValueFSM inits a new KeyValueFSM
-func NewKeyValueFSM() *KeyValueFSM {
-	return &KeyValueFSM{m: make(map[string]*KeyValueItem)}
+// NewInMemKeyValueFSM inits a new InMemKeyValueFSM
+func NewInMemKeyValueFSM() *InMemKeyValueFSM {
+	return &InMemKeyValueFSM{m: make(map[string]*KeyValuePair)}
 }
 
 // Get gets a value for the key.  It reads it directly from the stored log entry
-func (fsm *KeyValueFSM) Get(key string) *KeyValueItem {
+func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 	fsm.mu.RLock()
 	defer fsm.mu.RUnlock()
 
-	value, _ := fsm.m[key]
-	return value
+	value, ok := fsm.m[string(key)]
+	if ok {
+		return value, nil
+	}
+	return nil, errKeyNotFound
 }
 
-// Apply applies the given entry to the KeyValueFSM.  entryID is the hash id of the entry.
+// Apply applies the given entry to the InMemKeyValueFSM.  entryID is the hash id of the entry.
 // The first byte in entry.Data contains the operation to be performed followed by the
 // actual value.
-func (fsm *KeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
+func (fsm *InMemKeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil
 	}
@@ -57,7 +65,7 @@ func (fsm *KeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} 
 
 	switch op {
 	case opSet:
-		resp = fsm.applySet(string(entry.Key), entry.Data[1:], entry)
+		resp = fsm.applySet(entry.Key, entry.Data[1:], entry)
 
 	case opDel:
 		resp = fsm.applyDelete(string(entry.Key))
@@ -70,16 +78,16 @@ func (fsm *KeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} 
 	return resp
 }
 
-func (fsm *KeyValueFSM) applySet(key string, value []byte, entry *hexalog.Entry) error {
-	kv := &KeyValueItem{Entry: entry, Value: value, Key: key}
+func (fsm *InMemKeyValueFSM) applySet(key, value []byte, entry *hexalog.Entry) error {
+	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
 	fsm.mu.Lock()
-	fsm.m[key] = kv
+	fsm.m[string(key)] = kv
 	fsm.mu.Unlock()
 
 	return nil
 }
 
-func (fsm *KeyValueFSM) applyDelete(key string) error {
+func (fsm *InMemKeyValueFSM) applyDelete(key string) error {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
 
@@ -100,4 +108,9 @@ func (fsm *DummyFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	log.Printf("[INFO] DummyFSM key=%s height=%d id=%x data='%s'", entry.Key, entry.Height,
 		entryID, entry.Data)
 	return nil
+}
+
+// Get is a noop to satisfy the KeyValueFSM interface
+func (fsm *DummyFSM) Get(key []byte) (*KeyValuePair, error) {
+	return nil, fmt.Errorf("dummy fsm")
 }
