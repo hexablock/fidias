@@ -2,7 +2,7 @@
 The HTTP gateway provides access to the fidias cluster via HTTP API's
 
 ## Endpoints
-The following are a list of endpoints available for the HTTP API gateway.
+The following are a list of available endpoints:
 
 #### /v1/kv/*{ key }*
 This endpoint allows to perform key-value pair operations.
