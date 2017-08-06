@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -25,16 +25,16 @@ var (
 // FSM
 type InMemKeyValueFSM struct {
 	mu sync.RWMutex
-	m  map[string]*KeyValuePair
+	m  map[string]*hexatype.KeyValuePair
 }
 
 // NewInMemKeyValueFSM inits a new InMemKeyValueFSM
 func NewInMemKeyValueFSM() *InMemKeyValueFSM {
-	return &InMemKeyValueFSM{m: make(map[string]*KeyValuePair)}
+	return &InMemKeyValueFSM{m: make(map[string]*hexatype.KeyValuePair)}
 }
 
 // Get gets a value for the key.  It reads it directly from the stored log entry
-func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
+func (fsm *InMemKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
 	fsm.mu.RLock()
 	defer fsm.mu.RUnlock()
 
@@ -48,7 +48,7 @@ func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 // Apply applies the given entry to the InMemKeyValueFSM.  entryID is the hash id of the entry.
 // The first byte in entry.Data contains the operation to be performed followed by the
 // actual value.
-func (fsm *InMemKeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
+func (fsm *InMemKeyValueFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil
 	}
@@ -73,8 +73,8 @@ func (fsm *InMemKeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interfa
 	return resp
 }
 
-func (fsm *InMemKeyValueFSM) applySet(key, value []byte, entry *hexalog.Entry) error {
-	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
+func (fsm *InMemKeyValueFSM) applySet(key, value []byte, entry *hexatype.Entry) error {
+	kv := &hexatype.KeyValuePair{Entry: entry, Value: value, Key: key}
 	fsm.mu.Lock()
 	fsm.m[string(key)] = kv
 	fsm.mu.Unlock()
@@ -99,13 +99,13 @@ type DummyFSM struct{}
 
 // Apply gets called by hexalog each time a new entry has been commit and accepted by the
 // cluster
-func (fsm *DummyFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
+func (fsm *DummyFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	log.Printf("[INFO] DummyFSM key=%s height=%d id=%x data='%s'", entry.Key, entry.Height,
 		entryID, entry.Data)
 	return nil
 }
 
 // Get is a noop to satisfy the KeyValueFSM interface
-func (fsm *DummyFSM) Get(key []byte) (*KeyValuePair, error) {
+func (fsm *DummyFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
 	return nil, fmt.Errorf("dummy fsm")
 }

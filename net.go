@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hexablock/hexatype"
+
 	"google.golang.org/grpc"
 
 	"golang.org/x/net/context"
@@ -13,7 +15,7 @@ import (
 
 // KeyValueStore implements a key value store interface
 type KeyValueStore interface {
-	Get(key []byte) (*KeyValuePair, error)
+	Get(key []byte) (*hexatype.KeyValuePair, error)
 }
 
 type rpcOutConn struct {
@@ -36,17 +38,17 @@ type NetTransport struct {
 }
 
 // GetKey retrieves a key from a remote host
-func (trans *NetTransport) GetKey(host string, key []byte) (*KeyValuePair, error) {
+func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
 	conn, err := trans.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	return conn.client.GetKeyRPC(context.Background(), &KeyValuePair{Key: key})
+	return conn.client.GetKeyRPC(context.Background(), &hexatype.KeyValuePair{Key: key})
 }
 
 // GetKeyRPC serves a GetKey request
-func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*KeyValuePair, error) {
+func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *hexatype.KeyValuePair) (*hexatype.KeyValuePair, error) {
 	return trans.kvs.Get(in.Key)
 }
 

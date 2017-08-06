@@ -1,10 +1,13 @@
 package fidias
 
-import "github.com/hexablock/hexalog"
+import (
+	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexatype"
+)
 
 // KVNetTransport implements a network transport for key-value operations
 type KVNetTransport interface {
-	GetKey(host string, key []byte) (*KeyValuePair, error)
+	GetKey(host string, key []byte) (*hexatype.KeyValuePair, error)
 }
 
 type localTransport struct {
@@ -18,15 +21,15 @@ type localTransport struct {
 }
 
 // GetEntry gets a local or remote entry based on host
-func (trans *localTransport) GetEntry(host string, key, id []byte) (*hexalog.Entry, error) {
+func (trans *localTransport) GetEntry(host string, key, id []byte) (*hexatype.Entry, error) {
 	if trans.host == host {
 		return trans.local.GetEntry(key, id)
 	}
-	return trans.remote.GetEntry(host, key, id, &hexalog.RequestOptions{})
+	return trans.remote.GetEntry(host, key, id, &hexatype.RequestOptions{})
 }
 
 // GetKey gets a local or remote key-value pair based on the host
-func (trans *localTransport) GetKey(host string, key []byte) (*KeyValuePair, error) {
+func (trans *localTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
 	if trans.host == host {
 		return trans.kvlocal.Get(key)
 	}

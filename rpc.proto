@@ -2,14 +2,8 @@ syntax = "proto3";
 
 package fidias;
 
-import "github.com/hexablock/hexalog/rpc.proto";
+import "github.com/hexablock/hexatype/types.proto";
 
 service FidiasRPC {
-    rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
-}
-
-message KeyValuePair {
-    bytes Key = 1;
-    bytes Value = 2;
-    hexalog.Entry Entry = 3;
+    rpc GetKeyRPC(hexatype.KeyValuePair) returns (hexatype.KeyValuePair) {}
 }

@@ -3,10 +3,11 @@ package fidias
 import (
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
-func (fidias *Fidias) heal(req *hexalog.ReqResp) (*hexalog.FutureEntry, *ReMeta, error) {
+func (fidias *Fidias) heal(req *hexatype.ReqResp) (*hexalog.FutureEntry, *ReMeta, error) {
 	e := req.Entry
 	opts := req.Options
 
@@ -36,7 +37,7 @@ func (fidias *Fidias) heal(req *hexalog.ReqResp) (*hexalog.FutureEntry, *ReMeta,
 		last := keylog.LastEntry()
 		if last == nil {
 			// Dont set Previous so we can signal a complete keylog download
-			last = &hexalog.Entry{Key: e.Key}
+			last = &hexatype.Entry{Key: e.Key}
 		}
 
 		if _, er := fidias.trans.remote.FetchKeylog(vn.Host, last); er != nil {

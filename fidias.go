@@ -10,13 +10,14 @@ import (
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 )
 
 // KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
 // contains key-value functions needed.
 type KeyValueFSM interface {
 	hexalog.FSM
-	Get(key []byte) (*KeyValuePair, error)
+	Get(key []byte) (*hexatype.KeyValuePair, error)
 }
 
 // ReMeta contains metadata associated to a request or response
@@ -124,27 +125,27 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 }
 
 // NewEntry returns a new Entry for the given key from Hexalog
-func (fidias *Fidias) NewEntry(key []byte) *hexalog.Entry {
+func (fidias *Fidias) NewEntry(key []byte) *hexatype.Entry {
 	return fidias.hexlog.New(key)
 }
 
 // ProposeEntry finds locations for the entry and submits a new proposal to those
 // locations.
-func (fidias *Fidias) ProposeEntry(entry *hexalog.Entry) (*hexalog.Ballot, *ReMeta, error) {
+func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry) (*hexalog.Ballot, *ReMeta, error) {
 	// Lookup locations for this key
 	locs, err := fidias.ring.LookupReplicated(entry.Key, fidias.conf.Replicas)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	opts := &hexalog.RequestOptions{PeerSet: locs}
+	opts := &hexatype.RequestOptions{PeerSet: locs}
 	ballot, err := fidias.hexlog.Propose(entry, opts)
 	return ballot, &ReMeta{PeerSet: hexaring.LocationSet(locs)}, err
 }
 
 // GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
 // upto the max allowed successors for each location.
-func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMeta, err error) {
+func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReMeta, err error) {
 	meta = &ReMeta{}
 	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
 		ent, er := fidias.trans.GetEntry(vn.Host, key, id)
@@ -169,7 +170,7 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMe
 
 // GetKey tries to get a key-value pair from the ring.  This is not be confused with the
 // log key.  It orbits the ring to return the first occurence of the key-value pair.
-func (fidias *Fidias) GetKey(key []byte) (kvp *KeyValuePair, meta *ReMeta, err error) {
+func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
 	meta = &ReMeta{}
 
 	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
