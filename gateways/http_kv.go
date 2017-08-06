@@ -11,7 +11,7 @@ import (
 	"github.com/hexablock/hexaring"
 )
 
-func (server *HTTPServer) handleGet(resourceID string, n int, reqURI string) (code int, data interface{}, err error) {
+func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) (code int, data interface{}, err error) {
 	var (
 		key  = []byte(resourceID)
 		locs hexaring.LocationSet
@@ -44,11 +44,54 @@ func (server *HTTPServer) handleGet(resourceID string, n int, reqURI string) (co
 	return
 }
 
-func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
+func (server *HTTPServer) handleSetKey(resourceID string, reqData []byte, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
+
 	headers = map[string]string{}
 
+	entry := server.fids.NewEntry([]byte(resourceID))
+	entry.Data = append([]byte{fidias.OpSet}, reqData...)
+	code = 200
+
+	var (
+		ballot *hexalog.Ballot
+		meta   *fidias.ReMeta
+	)
+	if ballot, meta, err = server.fids.ProposeEntry(entry); err == nil {
+		if err = ballot.Wait(); err == nil {
+			data = ballot.Future()
+			headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
+		}
+		headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
+
+	} else if strings.Contains(err.Error(), "not in peer set") {
+		// Redirect to the next location after us.
+		var next *hexaring.Location
+		if next, err = meta.PeerSet.GetNext(server.conf.Hostname()); err == nil {
+			if data, err = generateRedirect(next.Vnode, reqURI); err == nil {
+				code = statusCodeRedirect
+			}
+		} else {
+			// If the above fails redirect to the natural key
+			if strings.Contains(err.Error(), "host not in set") {
+				// Redirect to the natural key holder
+				if data, err = generateRedirect(meta.PeerSet[0].Vnode, reqURI); err == nil {
+					code = statusCodeRedirect
+				}
+			}
+		}
+		//
+		// TODO:
+		// During high churn you may reach the max redirect limit.  This may need to
+		// be addressed
+		//
+	}
+
+	return
+}
+
+func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
 	//
-	// TODO: make following redirects a user controllable option
+	// TODO: Allow user to control it they want to follow redirects
 	//
 
 	if resourceID == "" {
@@ -69,7 +112,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 			n = server.conf.Replicas
 		}
 
-		code, data, err = server.handleGet(resourceID, n, r.RequestURI)
+		code, data, err = server.handleGetKey(resourceID, n, r.RequestURI)
 
 	case http.MethodPost, http.MethodPut:
 		// Append a set operation entry to the log
@@ -79,43 +122,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		}
 		defer r.Body.Close()
 
-		entry := server.fids.NewEntry([]byte(resourceID))
-		entry.Data = append([]byte{fidias.OpSet}, b...)
-		code = 200
-
-		var (
-			ballot *hexalog.Ballot
-			meta   *fidias.ReMeta
-		)
-		if ballot, meta, err = server.fids.ProposeEntry(entry); err == nil {
-			if err = ballot.Wait(); err == nil {
-				data = ballot.Future()
-				headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
-			}
-			headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
-
-		} else if strings.Contains(err.Error(), "not in peer set") {
-			// Redirect to the next location after us.
-			var next *hexaring.Location
-			if next, err = meta.PeerSet.GetNext(server.conf.Hostname()); err == nil {
-				if data, err = generateRedirect(next.Vnode, r.RequestURI); err == nil {
-					code = statusCodeRedirect
-				}
-			} else {
-				// If the above fails redirect to the natural key
-				if strings.Contains(err.Error(), "host not in set") {
-					// Redirect to the natural key holder
-					if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
-						code = statusCodeRedirect
-					}
-				}
-			}
-			//
-			// TODO:
-			// During high churn you may reach the max redirect limit.  This may need to
-			// be addressed
-			//
-		}
+		code, headers, data, err = server.handleSetKey(resourceID, b, r.RequestURI)
 
 	case http.MethodDelete:
 		// Append a delete operation entry to the log
