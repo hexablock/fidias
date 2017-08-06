@@ -53,14 +53,17 @@ func configure(conf *fidias.Config) {
 		// Setup the standard built-in log for underlying libraries
 		baselog.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		baselog.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
+
 		// Setup hexablock/log
 		log.SetLevel(log.LogLevelDebug)
+		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		log.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
 
 		// Lower the stabilization time in debug mode
 		conf.Ring.StabilizeMin = 1 * time.Second
 		conf.Ring.StabilizeMax = 3 * time.Second
 	} else {
+		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetLevel(log.LogLevelInfo)
 	}
