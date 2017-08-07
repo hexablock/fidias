@@ -19,11 +19,11 @@ type HTTPServer struct {
 	ring     *hexaring.Ring
 	fids     *fidias.Fidias
 	fsm      fidias.KeyValueFSM
-	logstore hexalog.LogStore
+	logstore *hexalog.LogStore
 }
 
 // NewHTTPServer instantiates a new Guac HTTP API server
-func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, fsm fidias.KeyValueFSM, logstore hexalog.LogStore, fids *fidias.Fidias) *HTTPServer {
+func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, fsm fidias.KeyValueFSM, logstore *hexalog.LogStore, fids *fidias.Fidias) *HTTPServer {
 	s := &HTTPServer{
 		prefix:   apiPrefix,
 		conf:     conf,

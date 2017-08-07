@@ -70,10 +70,9 @@ type Fidias struct {
 }
 
 // New instantiates a new instance of Fidias based on the given config
-func New(conf *Config, appFSM KeyValueFSM, logStore hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
+func New(conf *Config, appFSM KeyValueFSM, logStore *hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
 	g = &Fidias{
-		conf: conf,
-		//logstore:    logStore,
+		conf:        conf,
 		rebalanceCh: make(chan *RebalanceRequest, conf.RebalanceBufSize),
 		shutdown:    make(chan struct{}, 2), // healer, rebalancer
 	}

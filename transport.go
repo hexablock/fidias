@@ -13,7 +13,7 @@ type KVNetTransport interface {
 type localTransport struct {
 	host string
 	// hexalog local and remote
-	local  hexalog.LogStore
+	local  *hexalog.LogStore
 	remote hexalog.Transport
 	// key-value local and remote
 	kvlocal  KeyValueFSM

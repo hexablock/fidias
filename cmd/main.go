@@ -15,6 +15,7 @@ import (
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/fidias/gateways"
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
@@ -122,7 +123,8 @@ func main() {
 	// Stores
 	stableStore := &store.InMemStableStore{}
 	entryStore := store.NewInMemEntryStore()
-	logStore := store.NewInMemLogStore(entryStore, conf.Hexalog.Hasher)
+	idxStore := store.NewInMemIndexStore()
+	logStore := hexalog.NewLogStore(entryStore, idxStore, conf.Hexalog.Hasher)
 
 	peerStore := hexaring.NewInMemPeerStore()
 
