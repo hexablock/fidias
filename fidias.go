@@ -162,7 +162,7 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReM
 	if err == io.EOF {
 		err = nil
 	} else if entry == nil {
-		err = hexalog.ErrEntryNotFound
+		err = hexatype.ErrEntryNotFound
 	}
 
 	return

@@ -15,7 +15,7 @@ import (
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/fidias/gateways"
-	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
 )
@@ -120,8 +120,8 @@ func main() {
 	gserver := grpc.NewServer()
 
 	// Stores
-	stableStore := &hexalog.InMemStableStore{}
-	logStore := hexalog.NewInMemLogStore(conf.Hexalog.Hasher)
+	stableStore := &store.InMemStableStore{}
+	logStore := store.NewInMemLogStore(conf.Hexalog.Hasher)
 
 	peerStore := hexaring.NewInMemPeerStore()
 
