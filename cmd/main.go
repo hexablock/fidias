@@ -121,7 +121,8 @@ func main() {
 
 	// Stores
 	stableStore := &store.InMemStableStore{}
-	logStore := store.NewInMemLogStore(conf.Hexalog.Hasher)
+	entryStore := store.NewInMemEntryStore()
+	logStore := store.NewInMemLogStore(entryStore, conf.Hexalog.Hasher)
 
 	peerStore := hexaring.NewInMemPeerStore()
 
