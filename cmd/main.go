@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"hash"
 	"io/ioutil"
 	baselog "log"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -32,6 +34,7 @@ var (
 	httpAddr      = flag.String("http-addr", "127.0.0.1:9090", "HTTP bind address")
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
+	hashFunc      = flag.String("hash", "SHA1", "Hash function to use [ SHA1 | SHA256 ]")
 	showVersion   = flag.Bool("version", false, "Show version")
 	debug         = flag.Bool("debug", false, "Turn on debug mode")
 )
@@ -67,6 +70,14 @@ func configure(conf *fidias.Config) {
 		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetLevel(log.LogLevelInfo)
+	}
+
+	// Set the hasher to sha256
+	if *hashFunc == "SHA256" {
+		conf.Hexalog.Hasher = &hexatype.SHA256Hasher{}
+		conf.Ring.HashFunc = func() hash.Hash {
+			return (&hexatype.SHA256Hasher{}).New()
+		}
 	}
 
 	printStartBanner(conf)

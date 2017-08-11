@@ -70,6 +70,10 @@ $ curl -XGET http://127.0.0.1:9090/v1/locate/testkey
 ```
 The cluster is now running and can be used.  Details on the HTTP API can be found in the [API docs](./gateways/README.md).
 
+### Development
+
+- When using debug mode a significant performance degrade may be seen.
+
 ### Roadmap
 
 Coming Soon!!

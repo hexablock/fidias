@@ -7,6 +7,11 @@ import (
 	"github.com/hexablock/log"
 )
 
+//
+// TODO: The algorithm needs improvement to perform actual reconciliation by checking all
+// members of the peer set and reconciling as needed
+//
+
 func (fidias *Fidias) heal(req *hexatype.ReqResp) (*hexalog.FutureEntry, *ReMeta, error) {
 	e := req.Entry
 	opts := req.Options

@@ -44,13 +44,15 @@ func (conf *Config) Hostname() string {
 // DefaultConfig returns a default sane config setting the hostname on the log and ring
 // configs
 func DefaultConfig(hostname string) *Config {
-	return &Config{
+	cfg := &Config{
 		Replicas:         3,
 		RebalanceBufSize: 32,
 		Ring:             hexaring.DefaultConfig(hostname),
 		Hexalog:          hexalog.DefaultConfig(hostname),
 		StableThreshold:  5 * time.Minute,
 	}
+
+	return cfg
 }
 
 // Fidias is the core that manages all operations for a node.  It primary manages

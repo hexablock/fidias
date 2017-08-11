@@ -38,8 +38,12 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 				}
 			}
 		} else {
-			// Get the complete log.
-			data, err = server.logstore.GetKey([]byte(resourceID))
+			// Get the keylog index only.
+			var lk *hexalog.Keylog
+			if lk, err = server.logstore.GetKey([]byte(resourceID)); err == nil {
+				data = lk.GetIndex()
+			}
+
 		}
 
 	case http.MethodPost:
