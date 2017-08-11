@@ -66,6 +66,9 @@ func parseIntQueryParam(r *http.Request, param string) (int, error) {
 	return d, nil
 }
 
+// writeJSONResponse writes a json response.  It first sets the headers, then the code and
+// finally the data.  It manages serializing the data.  It data is a byte slice then it simply
+// writes the data without setting any content type headers
 func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]string, data interface{}, err error) {
 	var (
 		b []byte
@@ -103,6 +106,8 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 		w.Header().Set(k, v)
 	}
 
+	// Write code
 	w.WriteHeader(c)
+	// Write data
 	w.Write(b)
 }

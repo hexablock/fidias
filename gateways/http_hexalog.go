@@ -9,6 +9,7 @@ import (
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexaring"
 )
 
 // handleHexalog serves http requests to get a keylog and add an entry to the keylog by key
@@ -17,6 +18,22 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 
 	if resourceID == "" {
 		code = 404
+		return
+	}
+
+	var locs hexaring.LocationSet
+	if locs, err = server.ring.LookupReplicated([]byte(resourceID), server.conf.Replicas); err != nil {
+		return
+	}
+
+	host := server.conf.Hostname()
+
+	// Check if host is part of the location set otherwise re-direct to the natural vnode
+	//var loc *hexaring.Location
+	if _, err = locs.GetByHost(host); err != nil {
+		if data, err = generateRedirect(locs[0].Vnode, r.RequestURI); err == nil {
+			code = statusCodeRedirect
+		}
 		return
 	}
 

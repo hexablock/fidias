@@ -6,11 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hexablock/hexatype"
-
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"golang.org/x/net/context"
+	"github.com/hexablock/hexatype"
 )
 
 // KeyValueStore implements a key value store interface
