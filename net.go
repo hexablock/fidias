@@ -30,7 +30,7 @@ type NetTransport struct {
 	kvs KeyValueStore
 
 	mu   sync.RWMutex
-	pool map[string][]*rpcOutConn
+	pool map[string]*rpcOutConn
 
 	maxConnIdle  time.Duration
 	reapInterval time.Duration
@@ -64,28 +64,28 @@ func (trans *NetTransport) getConn(host string) (*rpcOutConn, error) {
 	}
 
 	// Check if we have a conn cached
-	var out *rpcOutConn
-	trans.mu.Lock()
-	list, ok := trans.pool[host]
-	if ok && len(list) > 0 {
-		out = list[len(list)-1]
-		list = list[:len(list)-1]
-		trans.pool[host] = list
+	trans.mu.RLock()
+	if out, ok := trans.pool[host]; ok && out != nil {
+		defer trans.mu.RUnlock()
+		return out, nil
 	}
-	trans.mu.Unlock()
+	trans.mu.RUnlock()
+
 	// Make a new connection
-	if out == nil {
-		conn, err := grpc.Dial(host, grpc.WithInsecure())
-		if err == nil {
-			return &rpcOutConn{
-				host:   host,
-				client: NewFidiasRPCClient(conn),
-				conn:   conn,
-				used:   time.Now(),
-			}, nil
-		}
+	conn, err := grpc.Dial(host, grpc.WithInsecure())
+	if err != nil {
 		return nil, err
 	}
+
+	trans.mu.Lock()
+	out := &rpcOutConn{
+		host:   host,
+		client: NewFidiasRPCClient(conn),
+		conn:   conn,
+		used:   time.Now(),
+	}
+	trans.pool[host] = out
+	trans.mu.Unlock()
 
 	return out, nil
 }
@@ -101,8 +101,7 @@ func (trans *NetTransport) returnConn(o *rpcOutConn) {
 
 	// Push back into the pool
 	trans.mu.Lock()
-	list, _ := trans.pool[o.host]
-	trans.pool[o.host] = append(list, o)
+	trans.pool[o.host] = o
 	trans.mu.Unlock()
 }
 
@@ -119,18 +118,11 @@ func (trans *NetTransport) reapOld() {
 func (trans *NetTransport) reapOnce() {
 	trans.mu.Lock()
 
-	for host, conns := range trans.pool {
-		max := len(conns)
-		for i := 0; i < max; i++ {
-			if time.Since(conns[i].used) > trans.maxConnIdle {
-				conns[i].conn.Close()
-				conns[i], conns[max-1] = conns[max-1], nil
-				max--
-				i--
-			}
+	for host, conn := range trans.pool {
+		if time.Since(conn.used) > trans.maxConnIdle {
+			conn.conn.Close()
+			delete(trans.pool, host)
 		}
-		// Trim any idle conns
-		trans.pool[host] = conns[:max]
 	}
 
 	trans.mu.Unlock()
