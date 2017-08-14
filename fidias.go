@@ -14,7 +14,7 @@ import (
 )
 
 // KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
-// contains key-value functions needed.
+// contains read-only key-value functions needed.
 type KeyValueFSM interface {
 	hexalog.FSM
 	Get(key []byte) (*hexatype.KeyValuePair, error)
@@ -94,7 +94,7 @@ func New(conf *Config, appFSM KeyValueFSM, logStore *hexalog.LogStore, stableSto
 		fsm = appFSM
 	}
 
-	kvremote := &NetTransport{kvs: fsm}
+	kvremote := NewNetTransport(fsm, 30*time.Second, conf.Ring.MaxConnIdle)
 	g.trans = &localTransport{
 		host:     conf.Hostname(),
 		local:    logStore,
@@ -125,30 +125,41 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	go fidias.startRebalancer()
 }
 
-// NewEntry returns a new Entry for the given key from Hexalog
-func (fidias *Fidias) NewEntry(key []byte) *hexatype.Entry {
-	return fidias.hexlog.New(key)
-}
-
-// ProposeEntry finds locations for the entry and submits a new proposal to those
-// locations.
-func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry) (*hexalog.Ballot, *ReMeta, error) {
+// NewEntry returns a new Entry for the given key from Hexalog. r is the number of replicas
+// to use.  If r is <=0 r is set to the default configured replication count.  It returns
+// an error if the node is not part of the location set or a lookup error occurs
+func (fidias *Fidias) NewEntry(key []byte, r int) (*hexatype.Entry, *ReMeta, error) {
 	// Lookup locations for this key
-	locs, err := fidias.ring.LookupReplicated(entry.Key, fidias.conf.Replicas)
+	locs, err := fidias.ring.LookupReplicated(key, r)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	opts := &hexatype.RequestOptions{PeerSet: locs}
-	ballot, err := fidias.hexlog.Propose(entry, opts)
-	return ballot, &ReMeta{PeerSet: hexaring.LocationSet(locs)}, err
+	meta := &ReMeta{PeerSet: locs}
+
+	//
+	// TODO: Optimize ???
+	//
+
+	if _, err = locs.GetByHost(fidias.conf.Hostname()); err != nil {
+		return nil, meta, err
+	}
+
+	entry := fidias.hexlog.New(key)
+	return entry, meta, nil
+}
+
+// ProposeEntry finds locations for the entry and submits a new proposal to those
+// locations.
+func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.Ballot, error) {
+	return fidias.hexlog.Propose(entry, opts)
 }
 
 // GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
 // upto the max allowed successors for each location.
 func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReMeta, err error) {
 	meta = &ReMeta{}
-	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
+	_, err = fidias.ring.ScourReplicatedKey(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
 		ent, er := fidias.trans.GetEntry(vn.Host, key, id)
 		if er == nil {
 			entry = ent
@@ -169,28 +180,30 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReM
 	return
 }
 
-// GetKey tries to get a key-value pair from the ring.  This is not be confused with the
-// log key.  It orbits the ring to return the first occurence of the key-value pair.
+// GetKey tries to get a key-value pair from a given replica set on the ring.  This is not
+// be confused with the log key.  It scours the first replica only.
 func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
-	meta = &ReMeta{}
 
-	_, err = fidias.ring.Orbit(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
-		kv, er := fidias.trans.GetKey(vn.Host, key)
-		if er == nil {
-			kvp = kv
+	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Replicas)
+	if err != nil {
+		return nil, nil, err
+	}
+	meta = &ReMeta{PeerSet: locs}
+
+	_, err = fidias.ring.ScourReplica(locs[0].ID, func(vn *chord.Vnode) error {
+		if k, e := fidias.trans.GetKey(vn.Host, key); e == nil {
+			kvp = k
 			meta.Vnode = vn
-			// We found the entry so we return an EOF
 			return io.EOF
 		}
-
 		return nil
 	})
 
-	// We found the entry.
 	if err == io.EOF {
+		// We found the entry.
 		err = nil
 	} else if kvp == nil {
-		err = errKeyNotFound
+		err = hexatype.ErrKeyNotFound
 	}
 
 	return

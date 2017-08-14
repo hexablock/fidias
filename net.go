@@ -12,11 +12,6 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// KeyValueStore implements a key value store interface
-type KeyValueStore interface {
-	Get(key []byte) (*hexatype.KeyValuePair, error)
-}
-
 type rpcOutConn struct {
 	host   string
 	conn   *grpc.ClientConn
@@ -36,6 +31,15 @@ type NetTransport struct {
 	shutdown     int32
 }
 
+func NewNetTransport(kvs KeyValueStore, reapInterval, maxIdle time.Duration) *NetTransport {
+	return &NetTransport{
+		kvs:          kvs,
+		pool:         make(map[string]*rpcOutConn),
+		maxConnIdle:  maxIdle,
+		reapInterval: reapInterval,
+	}
+}
+
 // GetKey retrieves a key from a remote host
 func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
 	conn, err := trans.getConn(host)
@@ -43,7 +47,11 @@ func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePa
 		return nil, err
 	}
 
-	return conn.client.GetKeyRPC(context.Background(), &hexatype.KeyValuePair{Key: key})
+	kvp, err := conn.client.GetKeyRPC(context.Background(), &hexatype.KeyValuePair{Key: key})
+	if err != nil {
+		err = hexatype.ParseGRPCError(err)
+	}
+	return kvp, err
 }
 
 // GetKeyRPC serves a GetKey request

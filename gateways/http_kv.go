@@ -9,25 +9,27 @@ import (
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 )
 
-func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) (code int, data interface{}, err error) {
+func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
 	var (
+		host = server.conf.Hostname()
 		key  = []byte(resourceID)
 		locs hexaring.LocationSet
 	)
+	headers = map[string]string{}
 
+	// Find the starting position
 	if locs, err = server.ring.LookupReplicated(key, n); err != nil {
 		return
 	}
 
-	host := server.conf.Hostname()
-
 	// Check if host is part of the location set otherwise re-direct to the natural vnode
 	//var loc *hexaring.Location
 	if _, err = locs.GetByHost(host); err != nil {
-		if data, err = generateRedirect(locs[0].Vnode, reqURI); err == nil {
-			code = statusCodeRedirect
+		if strings.Contains(err.Error(), "host not in set") {
+			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, locs, reqURI)
 		}
 		return
 	}
@@ -35,84 +37,64 @@ func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) 
 	data, _, err = server.fids.GetKey(key)
 	if err == nil {
 		code = 200
-	} else {
-		if strings.Contains(err.Error(), "not found") {
-			code = 404
-		}
+	} else if err == hexatype.ErrKeyNotFound {
+		code = 404
 	}
 
 	return
 }
 
-func (server *HTTPServer) handleSetKey(resourceID string, reqData []byte, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
-
+func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []byte, n int, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = map[string]string{}
 
-	entry := server.fids.NewEntry([]byte(resourceID))
-	entry.Data = append([]byte{fidias.OpSet}, reqData...)
-	code = 200
-
-	var (
-		ballot *hexalog.Ballot
-		meta   *fidias.ReMeta
-	)
-	if ballot, meta, err = server.fids.ProposeEntry(entry); err == nil {
-		if err = ballot.Wait(); err == nil {
-			data = ballot.Future()
-			headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
+	entry, meta, err := server.fids.NewEntry([]byte(resourceID), n)
+	if err != nil {
+		if strings.Contains(err.Error(), "host not in set") {
+			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, meta.PeerSet, reqURI)
 		}
-		headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
-
-	} else if strings.Contains(err.Error(), "not in peer set") {
-		// Redirect to the next location after us.
-		var next *hexaring.Location
-		if next, err = meta.PeerSet.GetNext(server.conf.Hostname()); err == nil {
-			if data, err = generateRedirect(next.Vnode, reqURI); err == nil {
-				code = statusCodeRedirect
-			}
-		} else {
-			// If the above fails redirect to the natural key
-			if strings.Contains(err.Error(), "host not in set") {
-				// Redirect to the natural key holder
-				if data, err = generateRedirect(meta.PeerSet[0].Vnode, reqURI); err == nil {
-					code = statusCodeRedirect
-				}
-			}
-		}
-		//
-		// TODO:
-		// During high churn you may reach the max redirect limit.  This may need to
-		// be addressed
-		//
+		return
 	}
 
+	entry.Data = append([]byte{op}, reqData...)
+	code = 200
+
+	var ballot *hexalog.Ballot
+	ballot, err = server.fids.ProposeEntry(entry, &hexatype.RequestOptions{PeerSet: meta.PeerSet})
+	if err != nil {
+		return
+	}
+
+	if err = ballot.Wait(); err == nil {
+		data = ballot.Future()
+		headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
+	}
+
+	// Runtime headers
+	headers[headerBallotTime] = fmt.Sprintf("%v", ballot.Runtime())
 	return
 }
 
 func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
-	//
-	// TODO: Allow user to control it they want to follow redirects
-	//
-
 	if resourceID == "" {
 		code = 404
 		return
+	}
+
+	// Parameters
+	var n int
+	n, err = parseIntQueryParam(r, "n")
+	if err != nil {
+		return
+	}
+	if n == 0 {
+		n = server.conf.Replicas
 	}
 
 	code = 200
 
 	switch r.Method {
 	case http.MethodGet:
-		var n int
-		n, err = parseIntQueryParam(r, "n")
-		if err != nil {
-			break
-		}
-		if n == 0 {
-			n = server.conf.Replicas
-		}
-
-		code, data, err = server.handleGetKey(resourceID, n, r.RequestURI)
+		code, headers, data, err = server.handleGetKey(resourceID, n, r.RequestURI)
 
 	case http.MethodPost, http.MethodPut:
 		// Append a set operation entry to the log
@@ -122,30 +104,10 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		}
 		defer r.Body.Close()
 
-		code, headers, data, err = server.handleSetKey(resourceID, b, r.RequestURI)
+		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpSet, b, n, r.RequestURI)
 
 	case http.MethodDelete:
-		// Append a delete operation entry to the log
-		entry := server.fids.NewEntry([]byte(resourceID))
-		entry.Data = []byte{fidias.OpDel}
-		code = 200
-
-		var (
-			ballot *hexalog.Ballot
-			meta   *fidias.ReMeta
-		)
-		if ballot, meta, err = server.fids.ProposeEntry(entry); err == nil {
-			if err = ballot.Wait(); err == nil {
-				data = ballot.Future()
-			}
-		} else if strings.Contains(err.Error(), "not in peer set") {
-
-			// Redirect to the natural key holder
-			if data, err = generateRedirect(meta.PeerSet[0].Vnode, r.RequestURI); err == nil {
-				code = statusCodeRedirect
-			}
-
-		}
+		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpDel, []byte{}, n, r.RequestURI)
 
 	default:
 		code = 405

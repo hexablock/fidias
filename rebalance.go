@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"bytes"
+	"sync"
 
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/log"
@@ -25,11 +26,17 @@ func (fidias *Fidias) rebalance(src, dst *chord.Vnode) {
 	}
 
 	// Transfer keys
-	for key, locID := range keys {
-		log.Printf("[DEBUG] Transfer location-id=%x key=%s src=%x dst=%x", locID, key, src.Id, dst.Id)
-		if err := fidias.trans.remote.TransferKeylog(dst.Host, []byte(key)); err != nil {
-			log.Printf("[ERROR] Failed to transfer location-id=%x key=%s error='%v'", locID, key, err)
-		}
+	log.Printf("[INFO] Transferring keys=%d src=%x dst=%x", len(keys), src.Id, dst.Id)
+	for k, li := range keys {
+		// 1 go-routine per key
+		go func(key, host string, locID []byte) {
+
+			if err := fidias.trans.remote.TransferKeylog(host, []byte(key)); err != nil {
+				log.Printf("[ERROR] Failed to transfer location-id=%x key=%s error='%v'", locID, key, err)
+			}
+
+		}(k, dst.Host, li)
+
 	}
 
 }
@@ -58,4 +65,64 @@ func (fidias *Fidias) startRebalancer() {
 	}
 
 	fidias.shutdown <- struct{}{}
+}
+
+type rebalancer struct {
+	rmu sync.RWMutex
+	r   map[string]struct{} // keys being recieved
+	tmu sync.RWMutex
+	t   map[string]struct{} // keys being transfered
+}
+
+func newRebalancer() *rebalancer {
+	return &rebalancer{
+		r: make(map[string]struct{}),
+		t: make(map[string]struct{}),
+	}
+}
+
+func (reb *rebalancer) isReceiving(key string) bool {
+	reb.rmu.RLock()
+	defer reb.rmu.RUnlock()
+	_, ok := reb.r[key]
+	return ok
+}
+
+func (reb *rebalancer) setReceive(key string) {
+	reb.rmu.Lock()
+	reb.r[key] = struct{}{}
+	reb.rmu.Unlock()
+}
+
+func (reb *rebalancer) unsetReceive(key string) {
+	reb.rmu.Lock()
+	if _, ok := reb.r[key]; ok {
+		delete(reb.r, key)
+	}
+	reb.rmu.Unlock()
+}
+
+func (reb *rebalancer) isTransfering(key string) bool {
+	reb.tmu.RLock()
+	defer reb.tmu.RUnlock()
+	_, ok := reb.t[key]
+	return ok
+}
+
+func (reb *rebalancer) setTransfer(keys ...string) {
+	reb.tmu.Lock()
+	for _, k := range keys {
+		reb.t[k] = struct{}{}
+	}
+	reb.tmu.Unlock()
+}
+
+func (reb *rebalancer) unsetTransfer(keys ...string) {
+	reb.tmu.Lock()
+	for _, k := range keys {
+		if _, ok := reb.t[k]; ok {
+			delete(reb.t, k)
+		}
+	}
+	reb.tmu.Unlock()
 }

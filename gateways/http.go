@@ -1,7 +1,6 @@
 package gateways
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -34,6 +33,7 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, f
 	}
 	// URL path to handler map
 	s.routes = httpRoutes{
+		"leader":  s.handleLeader,
 		"lookup":  s.handleLookup,   // Chord lookups
 		"locate":  s.handleLocate,   // Replicated lookups
 		"status":  s.handleStatus,   // Overall status
@@ -55,43 +55,19 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code, headers, data, err := handler(w, r, resourceID)
-	if code == statusCodeRedirect {
-		urlstr := data.(string)
-		http.Redirect(w, r, urlstr, code)
-		return
-	}
+	// if code == statusCodeRedirect {
+	// 	urlstr := data.(string)
+	// 	http.Redirect(w, r, urlstr, code)
+	// 	return
+	// }
 
 	writeJSONResponse(w, code, headers, data, err)
 }
 
 func (server *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
-
-	switch r.Method {
-	case http.MethodGet:
-		code = 200
-		data = server.fids.Status()
-	case http.MethodOptions:
-		code = 200
-		data = server.statusOptionsBody(resourceID)
-	default:
-		code = 405
-	}
-
+	code = 200
+	data = server.fids.Status()
 	return
-}
-
-func (server *HTTPServer) statusOptionsBody(resourceID string) []byte {
-	return []byte(fmt.Sprintf(`
-  %s/status
-
-  Endpoint to gets status information about the node
-
-  Methods:
-
-    GET      Retreives the node status
-    OPTIONS  Information about the endpoint
-
-`, server.prefix))
 }
 
 // handleLookup lookups the requested number of successors n.  If n is not provied it is

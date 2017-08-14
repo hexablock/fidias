@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexaring"
 )
 
@@ -36,17 +35,6 @@ func locationSetHeaderVals(peerSet hexaring.LocationSet) string {
 		h[i] = fmt.Sprintf("%s/%x", p.Vnode.Host, p.Vnode.Id)
 	}
 	return strings.Join(h, ",")
-}
-
-// generateRedirect generates the redirect url based on the given vnode
-func generateRedirect(vn *chord.Vnode, reqURI string) (s string, err error) {
-	mt := chord.Meta{}
-	if err = mt.UnmarshalBinary(vn.Meta); err == nil {
-		host, _ := mt["http"]
-		s = fmt.Sprintf("http://%s%s", host, reqURI)
-	}
-
-	return
 }
 
 // parseIntQueryParam parses an int from the url query parameters.  It only uses the first
@@ -110,4 +98,29 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 	w.WriteHeader(c)
 	// Write data
 	w.Write(b)
+}
+
+func checkHostNotInSetErrorOrRedirect(e error, locs hexaring.LocationSet, reqPath string) (code int, headers map[string]string, data interface{}, err error) {
+	headers = make(map[string]string)
+
+	// simply return out error
+	// if !strings.Contains(e.Error(), "host not in set") {
+	// 	err = e
+	// 	return
+	// }
+
+	loc := locs[0]
+	meta := loc.Vnode.Metadata()
+
+	host, ok := meta["http"]
+	if !ok {
+		err = fmt.Errorf("Meta.http host not found")
+		return
+	}
+
+	headers["Location"] = fmt.Sprintf("http://%s%s", host, reqPath)
+	code = 307
+	data = loc
+
+	return
 }

@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	chord "github.com/hexablock/go-chord"
 	"github.com/hexablock/hexatype"
 )
 
@@ -55,16 +54,6 @@ func Test_writeJSONResponse_data(t *testing.T) {
 	cth = rsp2.Header["Content-Type"]
 	if cth != nil {
 		t.Fatal("should be nil")
-	}
-}
-
-func Test_generateRedirect(t *testing.T) {
-	s, err := generateRedirect(&chord.Vnode{Meta: []byte("http=foo")}, "/foo/bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s != "http://foo/foo/bar" {
-		t.Fatal("url mismatch")
 	}
 }
 

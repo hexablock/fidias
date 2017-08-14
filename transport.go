@@ -28,6 +28,13 @@ func (trans *localTransport) GetEntry(host string, key, id []byte) (*hexatype.En
 	return trans.remote.GetEntry(host, key, id, &hexatype.RequestOptions{})
 }
 
+func (trans *localTransport) LastEntry(host string, key []byte) (*hexatype.Entry, error) {
+	if trans.host == host {
+		return trans.local.LastEntry(key), nil
+	}
+	return trans.remote.LastEntry(host, key, &hexatype.RequestOptions{})
+}
+
 // GetKey gets a local or remote key-value pair based on the host
 func (trans *localTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
 	if trans.host == host {
