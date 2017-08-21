@@ -57,9 +57,9 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 			}
 		} else {
 			// Get the keylog index only.
-			var lk *hexalog.Keylog
-			if lk, err = server.logstore.GetKey([]byte(resourceID)); err == nil {
-				data = lk.GetIndex()
+			var keylog *hexalog.Keylog
+			if keylog, err = server.logstore.GetKey([]byte(resourceID)); err == nil {
+				data = keylog.GetIndex()
 			}
 
 		}

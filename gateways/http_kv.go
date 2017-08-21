@@ -26,16 +26,20 @@ func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) 
 	}
 
 	// Check if host is part of the location set otherwise re-direct to the natural vnode
-	//var loc *hexaring.Location
-	if _, err = locs.GetByHost(host); err != nil {
+	var loc *hexaring.Location
+	if loc, err = locs.GetByHost(host); err != nil {
 		if strings.Contains(err.Error(), "host not in set") {
 			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, locs, reqURI)
 		}
 		return
 	}
+	headers[headerLocations] = fmt.Sprintf("%s/%x", loc.Vnode.Host, loc.Vnode.Id)
 
-	data, _, err = server.fids.GetKey(key)
+	data, err = server.fsm.Get(key)
+	// var meta *fidias.ReMeta
+	// data, meta, err = server.fids.GetKey(key)
 	if err == nil {
+		//headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
 		code = 200
 	} else if err == hexatype.ErrKeyNotFound {
 		code = 404
@@ -58,8 +62,12 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 	entry.Data = append([]byte{op}, reqData...)
 	code = 200
 
-	var ballot *hexalog.Ballot
-	ballot, err = server.fids.ProposeEntry(entry, &hexatype.RequestOptions{PeerSet: meta.PeerSet})
+	var (
+		ballot *hexalog.Ballot
+		opts   = &hexatype.RequestOptions{PeerSet: meta.PeerSet}
+	)
+
+	ballot, err = server.fids.ProposeEntry(entry, opts)
 	if err != nil {
 		return
 	}

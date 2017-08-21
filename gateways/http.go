@@ -34,11 +34,11 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, f
 	// URL path to handler map
 	s.routes = httpRoutes{
 		"leader":  s.handleLeader,
-		"lookup":  s.handleLookup,   // Chord lookups
 		"locate":  s.handleLocate,   // Replicated lookups
-		"status":  s.handleStatus,   // Overall status
+		"lookup":  s.handleLookup,   // Chord lookups
 		"hexalog": s.handleHexalog,  // Hexalog interations
 		"kv":      s.handleKeyValue, // Key-value operations
+		"status":  s.handleStatus,   // Overall status
 	}
 
 	return s
@@ -55,12 +55,6 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code, headers, data, err := handler(w, r, resourceID)
-	// if code == statusCodeRedirect {
-	// 	urlstr := data.(string)
-	// 	http.Redirect(w, r, urlstr, code)
-	// 	return
-	// }
-
 	writeJSONResponse(w, code, headers, data, err)
 }
 

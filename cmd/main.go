@@ -83,23 +83,23 @@ func configure(conf *fidias.Config) {
 	printStartBanner(conf)
 }
 
-func initHexaring(conf *fidias.Config, peerStore hexaring.PeerStore, server *grpc.Server) (ring *hexaring.Ring, err error) {
+func initHexaring(r *hexaring.Ring, peerStore hexaring.PeerStore) (err error) {
 	switch {
 
 	case *joinAddr != "":
 		addPeersToStore(peerStore, *joinAddr)
-		ring, err = hexaring.Join(conf.Ring, peerStore, server)
+		err = r.Join()
 
 	case *retryJoinAddr != "":
 		addPeersToStore(peerStore, *retryJoinAddr)
-		ring, err = hexaring.RetryJoin(conf.Ring, peerStore, server)
+		err = r.RetryJoin()
 
 	default:
-		ring, err = hexaring.Create(conf.Ring, peerStore, server)
+		err = r.Create()
 
 	}
 
-	return ring, err
+	return
 }
 
 func init() {
@@ -133,32 +133,34 @@ func main() {
 
 	// Stores
 	stableStore := &store.InMemStableStore{}
-	entryStore := store.NewInMemEntryStore()
+	entries := store.NewInMemEntryStore()
 	idxStore := store.NewInMemIndexStore()
-	logStore := hexalog.NewLogStore(entryStore, idxStore, conf.Hexalog.Hasher)
+	logStore := hexalog.NewLogStore(entries, idxStore, conf.Hexalog.Hasher)
 
-	peerStore := hexaring.NewInMemPeerStore()
+	peers := hexaring.NewInMemPeerStore()
+	// Init hexaring
+	ring := hexaring.New(conf.Ring, peers, gserver)
 
 	// Application FSM
 	fsm := fidias.NewInMemKeyValueFSM()
 
 	// Fidias
-	fids, err := fidias.New(conf, fsm, logStore, stableStore, gserver)
+	fids, err := fidias.New(conf, fsm, idxStore, entries, logStore, stableStore, gserver)
 	if err != nil {
 		log.Fatal("[ERROR] Failed to initialize fidias:", err)
 	}
 
-	// Start serving network requests as this is needed in order to init hexaring
+	// Start serving network requests.  This needs to be started before trying to create or
+	// join the ring as the ring initialization requires the transport
 	go gserver.Serve(ln)
 
 	// Create or join chord ring
 	log.Printf("[INFO] Initializing ring bind-address=%s", *clusterAddr)
-	ring, err := initHexaring(conf, peerStore, gserver)
-	if err != nil {
+	if err = initHexaring(ring, peers); err != nil {
 		log.Fatal("[ERROR]", err)
 	}
 
-	// Register ring with Guac
+	// Register ring
 	fids.Register(ring)
 
 	// Start HTTP API

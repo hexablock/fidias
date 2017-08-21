@@ -2,13 +2,13 @@ package fidias
 
 import (
 	"io"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 )
@@ -26,66 +26,29 @@ type ReMeta struct {
 	PeerSet hexaring.LocationSet // set of peers involved
 }
 
-// Config hold the guac config along with the underlying log and ring config
-type Config struct {
-	Ring             *hexaring.Config
-	Hexalog          *hexalog.Config
-	RebalanceBufSize int           // Rebalance request buffer size
-	Replicas         int           // Number of replicas for a key
-	StableThreshold  time.Duration // Threshold after ring event to consider we are stable
-}
-
-// Hostname returns the configured hostname. The assumption here is the log and ring
-// hostnames are the same as they should be checked and set prior to using this call
-func (conf *Config) Hostname() string {
-	return conf.Ring.Hostname
-}
-
-// DefaultConfig returns a default sane config setting the hostname on the log and ring
-// configs
-func DefaultConfig(hostname string) *Config {
-	cfg := &Config{
-		Replicas:         3,
-		RebalanceBufSize: 32,
-		Ring:             hexaring.DefaultConfig(hostname),
-		Hexalog:          hexalog.DefaultConfig(hostname),
-		StableThreshold:  5 * time.Minute,
-	}
-
-	return cfg
-}
-
 // Fidias is the core that manages all operations for a node.  It primary manages
 // rebalancing, replication, and appropriately deals with cluster churn.
 type Fidias struct {
-	conf          *Config
-	ring          *hexaring.Ring // Underlying chord ring
-	tmu           sync.RWMutex   // Ring event time lock
-	lastRingEvent time.Time      // Last time there was a ring membership change
-
-	trans *localTransport // Transport to handle local and remote calls
-
-	hexlog *hexalog.Hexalog // Overall log manager
-
-	rebalanceCh chan *RebalanceRequest // Rebalance request channel i.e transfer/takeover
-	shutdown    chan struct{}          // Channel to signal shutdown
+	// Configuration
+	conf *Config
+	// Underlying chord ring
+	ring *hexaring.Ring
+	// Transport to handle local and remote calls
+	trans *localTransport
+	// Overall log manager
+	hexlog *hexalog.Hexalog
+	// Blocks of keys this node is responsible for. These are the local vnodes and their
+	// respective predecessors
+	keyblocks *keyBlockSet
+	// Relocation engine to send keys to be relocated and fetch keys that have been
+	// relocated to this node
+	rel *Relocator
+	// Channel to signal shutdown
+	shutdown chan struct{}
 }
 
 // New instantiates a new instance of Fidias based on the given config
-func New(conf *Config, appFSM KeyValueFSM, logStore *hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
-	g = &Fidias{
-		conf:        conf,
-		rebalanceCh: make(chan *RebalanceRequest, conf.RebalanceBufSize),
-		shutdown:    make(chan struct{}, 2), // healer, rebalancer
-	}
-
-	// Set guac as the chord delegate
-	conf.Ring.Delegate = g
-
-	// Init hexalog transport and register with gRPC
-	logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
-	hexalog.RegisterHexalogRPCServer(server, logtrans)
-
+func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.EntryStore, logStore *hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
 	// Init the FSM
 	var fsm KeyValueFSM
 	if appFSM == nil {
@@ -94,25 +57,40 @@ func New(conf *Config, appFSM KeyValueFSM, logStore *hexalog.LogStore, stableSto
 		fsm = appFSM
 	}
 
-	kvremote := NewNetTransport(fsm, 30*time.Second, conf.Ring.MaxConnIdle)
+	g = &Fidias{
+		conf:      conf,
+		keyblocks: newKeyBlockSet(),
+		shutdown:  make(chan struct{}, 1), // rebalancer
+	}
+	// Fidias network transport
+	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Replicas,
+		conf.Hexalog.Hasher)
+	// Init hexalog transport and register with gRPC
+	logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
+	hexalog.RegisterHexalogRPCServer(server, logtrans)
+
+	// Key rebalancer
+	g.rel = NewRelocator(g.keyblocks, idx, entries, trans, logtrans, conf.Hexalog.Hasher,
+		conf.Replicas, conf.RebalanceBufSize)
+	// register fetch channel
+	trans.Register(g.rel.fetCh)
+
+	// Set self as the chord delegate
+	conf.Ring.Delegate = g
+
 	g.trans = &localTransport{
 		host:     conf.Hostname(),
 		local:    logStore,
 		remote:   logtrans,
 		kvlocal:  fsm,
-		kvremote: kvremote,
+		kvremote: trans,
 	}
 	// Register key-value rpc
-	RegisterFidiasRPCServer(server, kvremote)
+	RegisterFidiasRPCServer(server, trans)
 
 	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, logtrans)
 
 	return
-}
-
-// Status returns the status of this node
-func (fidias *Fidias) Status() interface{} {
-	return fidias.ring.Status()
 }
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
@@ -120,15 +98,14 @@ func (fidias *Fidias) Status() interface{} {
 // registration, the rebalancing is started.
 func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
-
-	go fidias.startHealer()
-	go fidias.startRebalancer()
+	go fidias.rel.start()
 }
 
 // NewEntry returns a new Entry for the given key from Hexalog. r is the number of replicas
 // to use.  If r is <=0 r is set to the default configured replication count.  It returns
 // an error if the node is not part of the location set or a lookup error occurs
 func (fidias *Fidias) NewEntry(key []byte, r int) (*hexatype.Entry, *ReMeta, error) {
+
 	// Lookup locations for this key
 	locs, err := fidias.ring.LookupReplicated(key, r)
 	if err != nil {
@@ -141,6 +118,7 @@ func (fidias *Fidias) NewEntry(key []byte, r int) (*hexatype.Entry, *ReMeta, err
 	// TODO: Optimize ???
 	//
 
+	//var self *hexaring.Location
 	if _, err = locs.GetByHost(fidias.conf.Hostname()); err != nil {
 		return nil, meta, err
 	}
@@ -180,6 +158,11 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReM
 	return
 }
 
+// Leader returns the leader of the given location set from the underlying log.
+func (fidias *Fidias) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.KeyLeader, error) {
+	return fidias.hexlog.Leader(key, locs)
+}
+
 // GetKey tries to get a key-value pair from a given replica set on the ring.  This is not
 // be confused with the log key.  It scours the first replica only.
 func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
@@ -210,9 +193,5 @@ func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMe
 }
 
 func (fidias *Fidias) shutdownWait() {
-	close(fidias.rebalanceCh)
-	// wait for shutdown
-	for i := 0; i < 2; i++ {
-		<-fidias.shutdown
-	}
+	fidias.rel.stop()
 }

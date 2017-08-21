@@ -3,7 +3,19 @@ syntax = "proto3";
 package fidias;
 
 import "github.com/hexablock/hexatype/types.proto";
+//import "github.com/hexablock/go-chord/net.proto";
 
 service FidiasRPC {
     rpc GetKeyRPC(hexatype.KeyValuePair) returns (hexatype.KeyValuePair) {}
+    // Send key-location id pairs
+    rpc RelocateRPC(stream KeyLocation) returns (stream KeyLocation) {}
+}
+
+message KeyLocation {
+    // Actual key
+    bytes Key = 1;
+    // Location id or last entry or id
+    bytes Marker = 2;
+    // Total known height of the key
+    uint32 Height = 3;
 }

@@ -1,48 +1,60 @@
 package fidias
 
 import (
-	"fmt"
-	"sync"
-	"sync/atomic"
+	"io"
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 
+	"github.com/hexablock/go-chord"
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 )
 
-type rpcOutConn struct {
-	host   string
-	conn   *grpc.ClientConn
-	client FidiasRPCClient
-	used   time.Time
+// RelocateStream is a stream to handle relocating of keys between nodes.
+type RelocateStream struct {
+	FidiasRPC_RelocateRPCClient             // grp stream client
+	o                           *rpcOutConn // connection to return
+	pool                        *outPool    // pool to return connection to
+}
+
+// Recycle recycles the stream returning the conn back to the pool
+func (rs *RelocateStream) Recycle() {
+	rs.pool.returnConn(rs.o)
 }
 
 // NetTransport implements a network transport needed for fidias
 type NetTransport struct {
-	kvs KeyValueStore
+	kvs  KeyValueStore
+	idxs store.IndexStore
 
-	mu   sync.RWMutex
-	pool map[string]*rpcOutConn
+	replicas int
+	hasher   hexatype.Hasher
+	fetCh    chan<- *relocateReq
 
-	maxConnIdle  time.Duration
-	reapInterval time.Duration
-	shutdown     int32
+	pool     *outPool
+	shutdown int32
 }
 
-func NewNetTransport(kvs KeyValueStore, reapInterval, maxIdle time.Duration) *NetTransport {
+// NewNetTransport instantiates a new network transport using the given key-value store.
+func NewNetTransport(kvs KeyValueStore, idx store.IndexStore, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
 	return &NetTransport{
-		kvs:          kvs,
-		pool:         make(map[string]*rpcOutConn),
-		maxConnIdle:  maxIdle,
-		reapInterval: reapInterval,
+		kvs:      kvs,
+		idxs:     idx,
+		replicas: replicas,
+		hasher:   hasher,
+		pool:     newOutPool(maxIdle, reapInterval),
 	}
+}
+
+// Register registers a write channel used for submitting reloc. requests
+func (trans *NetTransport) Register(ch chan<- *relocateReq) {
+	trans.fetCh = ch
 }
 
 // GetKey retrieves a key from a remote host
 func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
-	conn, err := trans.getConn(host)
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +63,8 @@ func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePa
 	if err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
+	trans.pool.returnConn(conn)
+
 	return kvp, err
 }
 
@@ -59,78 +73,65 @@ func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *hexatype.KeyValueP
 	return trans.kvs.Get(in.Key)
 }
 
-// Shutdown signals the transport to be shutdown.  After shutdown no new connections can
-// be made
-func (trans *NetTransport) Shutdown() {
-	atomic.StoreInt32(&trans.shutdown, 1)
-}
-
-func (trans *NetTransport) getConn(host string) (*rpcOutConn, error) {
-	if atomic.LoadInt32(&trans.shutdown) == 1 {
-		return nil, fmt.Errorf("transport is shutdown")
-	}
-
-	// Check if we have a conn cached
-	trans.mu.RLock()
-	if out, ok := trans.pool[host]; ok && out != nil {
-		defer trans.mu.RUnlock()
-		return out, nil
-	}
-	trans.mu.RUnlock()
-
-	// Make a new connection
-	conn, err := grpc.Dial(host, grpc.WithInsecure())
+// GetRelocateStream gets a stream to send rebalance data across
+func (trans *NetTransport) GetRelocateStream(local, remote *chord.Vnode) (*RelocateStream, error) {
+	conn, err := trans.pool.getConn(remote.Host)
 	if err != nil {
 		return nil, err
 	}
 
-	trans.mu.Lock()
-	out := &rpcOutConn{
-		host:   host,
-		client: NewFidiasRPCClient(conn),
-		conn:   conn,
-		used:   time.Now(),
-	}
-	trans.pool[host] = out
-	trans.mu.Unlock()
-
-	return out, nil
-}
-
-func (trans *NetTransport) returnConn(o *rpcOutConn) {
-	if atomic.LoadInt32(&trans.shutdown) == 1 {
-		o.conn.Close()
-		return
+	stream, err := conn.client.RelocateRPC(context.Background())
+	if err != nil {
+		return nil, hexatype.ParseGRPCError(err)
 	}
 
-	// Update the last used time
-	o.used = time.Now()
+	preamble := &chord.VnodePair{Self: local, Target: remote}
+	if err = stream.SendMsg(preamble); err != nil {
+		trans.pool.returnConn(conn)
+		return nil, hexatype.ParseGRPCError(err)
+	}
 
-	// Push back into the pool
-	trans.mu.Lock()
-	trans.pool[o.host] = o
-	trans.mu.Unlock()
+	return &RelocateStream{o: conn, FidiasRPC_RelocateRPCClient: stream, pool: trans.pool}, nil
 }
 
-func (trans *NetTransport) reapOld() {
+// RelocateRPC serves a rebalance request for the ring
+func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error {
+
+	var preamble chord.VnodePair
+	if err := stream.RecvMsg(&preamble); err != nil {
+		return err
+	}
+	// Flip remote to avoid confusion
+	//self := preamble.Target
+	//src := preamble.Self
+
 	for {
-		if atomic.LoadInt32(&trans.shutdown) == 1 {
-			return
+		keyLoc, err := stream.Recv()
+		//	Exit loop on error
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
 		}
-		time.Sleep(trans.reapInterval)
-		trans.reapOnce()
-	}
+
+		// Create key if it does not exist
+		trans.idxs.UpsertKey(keyLoc.Key, keyLoc.Marker)
+
+		//hashes := hexaring.BuildReplicaHashes(keyLoc.Key, int64(trans.replicas), trans.hasher.New())
+		//rid := getVnodeLocID(self.Id, hashes)
+		//log.Printf("[TODO] Relocate marker=%x src=%s/%x target=%x height=%d key=%s", keyLoc.Marker,
+		//	src.Host, src.Id[:12], self.Id, keyLoc.Height, keyLoc.Key)
+
+		// TODO: submit to channel which will start building the log
+		trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
+
+	} // end loop
+
 }
 
-func (trans *NetTransport) reapOnce() {
-	trans.mu.Lock()
-
-	for host, conn := range trans.pool {
-		if time.Since(conn.used) > trans.maxConnIdle {
-			conn.conn.Close()
-			delete(trans.pool, host)
-		}
-	}
-
-	trans.mu.Unlock()
+// Shutdown signals the transport to be shutdown.  After shutdown no new connections can
+// be
+func (trans *NetTransport) Shutdown() {
+	trans.pool.shutdown()
 }
