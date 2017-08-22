@@ -79,5 +79,6 @@ The cluster is now running and can be used.  Details on the HTTP API can be foun
 Coming Soon!!
 
 - Persistence
+- Adaptive stabilization
 - Locking mechanisms
 - Authentication, Authorization and Access

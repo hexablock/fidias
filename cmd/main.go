@@ -3,13 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"hash"
 	"io/ioutil"
-	baselog "log"
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
@@ -19,7 +16,6 @@ import (
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
-	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
@@ -27,61 +23,6 @@ var (
 	version   string
 	buildtime string
 )
-
-var (
-	advAddr       = flag.String("adv-addr", "", "Address to advertise to the network")
-	clusterAddr   = flag.String("cluster-addr", "127.0.0.1:54321", "Cluster bind address")
-	httpAddr      = flag.String("http-addr", "127.0.0.1:9090", "HTTP bind address")
-	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
-	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
-	hashFunc      = flag.String("hash", "SHA1", "Hash function to use [ SHA1 | SHA256 ]")
-	showVersion   = flag.Bool("version", false, "Show version")
-	debug         = flag.Bool("debug", false, "Turn on debug mode")
-)
-
-func printStartBanner(conf *fidias.Config) {
-	fmt.Printf(`
-  Version   : %s
-  Advertise : %s
-  Cluster   : %s
-  Hasher    : %s
-  HTTP      : %s
-
-`, version, *advAddr, conf.Hostname(), conf.Hexalog.Hasher.Algorithm(), *httpAddr)
-}
-
-func configure(conf *fidias.Config) {
-	conf.Ring.Meta["http"] = []byte(*httpAddr)
-
-	if *debug {
-		// Setup the standard built-in log for underlying libraries
-		baselog.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
-		baselog.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
-
-		// Setup hexablock/log
-		log.SetLevel(log.LogLevelDebug)
-		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
-		log.SetPrefix(fmt.Sprintf("|%s| ", *clusterAddr))
-
-		// Lower the stabilization time in debug mode
-		conf.Ring.StabilizeMin = 1 * time.Second
-		conf.Ring.StabilizeMax = 3 * time.Second
-	} else {
-		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
-		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
-		log.SetLevel(log.LogLevelInfo)
-	}
-
-	// Set the hasher to sha256
-	if *hashFunc == "SHA256" {
-		conf.Hexalog.Hasher = &hexatype.SHA256Hasher{}
-		conf.Ring.HashFunc = func() hash.Hash {
-			return (&hexatype.SHA256Hasher{}).New()
-		}
-	}
-
-	printStartBanner(conf)
-}
 
 func initHexaring(r *hexaring.Ring, peerStore hexaring.PeerStore) (err error) {
 	switch {
@@ -115,19 +56,16 @@ func main() {
 		return
 	}
 
-	if *advAddr == "" {
-		// TODO: check it is a valid advertiseable address
-		advAddr = clusterAddr
-	}
+	checkAddrs()
 
 	// Configuration
-	conf := fidias.DefaultConfig(*advAddr)
-	configure(conf)
+	conf := configure()
+	printStartBanner(conf)
 
 	// Server
-	ln, err := net.Listen("tcp", *clusterAddr)
+	ln, err := net.Listen("tcp", *bindAddr)
 	if err != nil {
-		log.Fatalf("[ERROR] Failed start listening on %s: %v", *clusterAddr, err)
+		log.Fatalf("[ERROR] Failed start listening on %s: %v", *bindAddr, err)
 	}
 	gserver := grpc.NewServer()
 
@@ -137,8 +75,8 @@ func main() {
 	idxStore := store.NewInMemIndexStore()
 	logStore := hexalog.NewLogStore(entries, idxStore, conf.Hexalog.Hasher)
 
-	peers := hexaring.NewInMemPeerStore()
 	// Init hexaring
+	peers := hexaring.NewInMemPeerStore()
 	ring := hexaring.New(conf.Ring, peers, gserver)
 
 	// Application FSM
@@ -155,7 +93,7 @@ func main() {
 	go gserver.Serve(ln)
 
 	// Create or join chord ring
-	log.Printf("[INFO] Initializing ring bind-address=%s", *clusterAddr)
+	log.Printf("[INFO] Initializing ring bind-address=%s", *bindAddr)
 	if err = initHexaring(ring, peers); err != nil {
 		log.Fatal("[ERROR]", err)
 	}
