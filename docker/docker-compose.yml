@@ -1,0 +1,64 @@
+
+version: '2'
+services:
+  bootstrap:
+    image: fidiasd
+    ports:
+      - "7700:7700"
+    environment:
+      FIDS_ADV_ADDR: "bootstrap:32100"
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7700"
+
+  peer1:
+    image: fidiasd
+    command: ["-retry-join=bootstrap:32100"]
+    ports:
+      - "7701:7700"
+    environment:
+      FIDS_ADV_ADDR: "peer1:32100"
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7701"
+
+  peer2:
+    image: fidiasd
+    command: ["-retry-join=bootstrap:32100"]
+    ports:
+      - "7702:7700"
+    environment:
+      FIDS_ADV_ADDR: "peer2:32100"
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7702"
+
+  peer3:
+    image: fidiasd
+    command: ["-retry-join=peer1:32100"]
+    ports:
+      - "7703:7700"
+    environment:
+      FIDS_ADV_ADDR: peer3:32100
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7703"
+
+  peer4:
+    image: fidiasd
+    command: ["-retry-join=peer2:32100"]
+    ports:
+      - "7704:7700"
+    environment:
+      FIDS_ADV_ADDR: peer4:32100
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7704"
+
+  peer5:
+    image: fidiasd
+    command: ["-retry-join=peer1:32100"]
+    ports:
+      - "7705:7700"
+    environment:
+      FIDS_ADV_ADDR: peer5:32100
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7705"
+
+  peer6:
+    image: fidiasd
+    command: ["-retry-join=bootstrap:32100"]
+    ports:
+      - "7706:7700"
+    environment:
+      FIDS_ADV_ADDR: peer6:32100
+      FIDS_HTTP_ADV_ADDR: "127.0.0.1:7706"
