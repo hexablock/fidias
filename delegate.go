@@ -30,14 +30,14 @@ func (fidias *Fidias) NewPredecessor(local, newPred, oldPred *chord.Vnode) {
 	//
 
 	// Send keys that need to be relocated
-	n, err := fidias.rel.relocate(local, newPred)
+	n, rt, err := fidias.rel.relocate(local, newPred)
 	if err != nil {
-		log.Printf("[ERROR] Relocation incomplete error='%v' src=%s/%x dst=%s/%x", err,
-			local.Host, local.Id[:12], newPred.Host, newPred.Id[:12])
+		log.Printf("[ERROR] Relocation incomplete error='%v' src=%s/%x dst=%s/%x runtime=%v", err,
+			local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt)
 
 	} else {
-		log.Printf("[INFO] Relocation complete keys=%d src=%s/%x dst=%s/%x", n, local.Host,
-			local.Id[:12], newPred.Host, newPred.Id[:12])
+		log.Printf("[INFO] Relocation complete keys=%d src=%s/%x dst=%s/%x runtime=%v", n, local.Host,
+			local.Id[:12], newPred.Host, newPred.Id[:12], rt)
 	}
 
 }

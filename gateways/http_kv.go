@@ -48,10 +48,10 @@ func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) 
 	return
 }
 
-func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []byte, n int, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
+func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []byte, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = map[string]string{}
 
-	entry, meta, err := server.fids.NewEntry([]byte(resourceID), n)
+	entry, meta, err := server.fids.NewEntry([]byte(resourceID))
 	if err != nil {
 		if strings.Contains(err.Error(), "host not in set") {
 			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, meta.PeerSet, reqURI)
@@ -64,7 +64,7 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 
 	var (
 		ballot *hexalog.Ballot
-		opts   = &hexatype.RequestOptions{PeerSet: meta.PeerSet}
+		opts   = &hexatype.RequestOptions{PeerSet: meta.PeerSet, Retries: 2}
 	)
 
 	ballot, err = server.fids.ProposeEntry(entry, opts)
@@ -112,10 +112,10 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		}
 		defer r.Body.Close()
 
-		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpSet, b, n, r.RequestURI)
+		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpSet, b, r.RequestURI)
 
 	case http.MethodDelete:
-		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpDel, []byte{}, n, r.RequestURI)
+		code, headers, data, err = server.handleWriteKey(resourceID, fidias.OpDel, []byte{}, r.RequestURI)
 
 	default:
 		code = 405

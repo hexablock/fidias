@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexatype"
@@ -101,9 +100,6 @@ func configure() *fidias.Config {
 		log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.LstdFlags)
 		log.SetPrefix(fmt.Sprintf("|%s| ", *advAddr))
 
-		// Lower the stabilization time in debug mode
-		conf.Ring.StabilizeMin = 1 * time.Second
-		conf.Ring.StabilizeMax = 3 * time.Second
 	} else {
 		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
@@ -124,10 +120,13 @@ func configure() *fidias.Config {
 func printStartBanner(conf *fidias.Config) {
 	fmt.Printf(`
   Version   : %s
+
   Advertise : %s
   Cluster   : %s
-  Hasher    : %s
   HTTP      : %s
 
-`, version, *advAddr, *bindAddr, conf.Hexalog.Hasher.Algorithm(), *httpAddr)
+  Hasher    : %s
+  Vnodes    : %d
+
+`, version, *advAddr, *bindAddr, *httpAddr, conf.Hexalog.Hasher.Algorithm(), conf.Ring.NumVnodes)
 }

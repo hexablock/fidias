@@ -11,6 +11,7 @@ import (
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 )
 
 type testServer struct {
@@ -85,14 +86,47 @@ func TestFidias(t *testing.T) {
 	}
 	<-time.After(100 * time.Millisecond)
 
-	_, _, err = ts1.fids.NewEntry([]byte("testkey1"), 2)
+	ts3, err := newTestServer("127.0.0.1:61236", "127.0.0.1:61234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-time.After(100 * time.Millisecond)
+
+	testkey1 := []byte("testkey1")
+
+	_, _, err = ts1.fids.NewEntry(testkey1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, _, err = ts2.fids.NewEntry([]byte("testkey1"), 2)
+	entry, remeta, err := ts2.fids.NewEntry(testkey1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	if _, err = ts3.fids.ProposeEntry(entry, &hexatype.RequestOptions{PeerSet: remeta.PeerSet}); err != nil {
+		t.Fatal(err)
+	}
+	<-time.After(10 * time.Millisecond)
+
+	ts4, err := newTestServer("127.0.0.1:61237", "127.0.0.1:61234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-time.After(200 * time.Millisecond)
+
+	locs, err := ts4.fids.ring.LookupReplicated(testkey1, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ts4.fids.fet.checkKey(testkey1, locs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ts1.fids.shutdownWait()
+	ts2.fids.shutdownWait()
+	ts3.fids.shutdownWait()
+	ts4.fids.shutdownWait()
 }

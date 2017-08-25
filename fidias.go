@@ -40,9 +40,10 @@ type Fidias struct {
 	// Blocks of keys this node is responsible for. These are the local vnodes and their
 	// respective predecessors
 	keyblocks *keyBlockSet
-	// Relocation engine to send keys to be relocated and fetch keys that have been
-	// relocated to this node
+	// Relocation engine to send keys to be relocated
 	rel *Relocator
+	// Fetcher used for log entry fetching
+	fet *fetcher
 	// Channel to signal shutdown
 	shutdown chan struct{}
 }
@@ -65,15 +66,12 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 	// Fidias network transport
 	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Replicas,
 		conf.Hexalog.Hasher)
+	// Register key-value rpc
+	RegisterFidiasRPCServer(server, trans)
+
 	// Init hexalog transport and register with gRPC
 	logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
 	hexalog.RegisterHexalogRPCServer(server, logtrans)
-
-	// Key rebalancer
-	g.rel = NewRelocator(g.keyblocks, idx, entries, trans, logtrans, conf.Hexalog.Hasher,
-		conf.Replicas, conf.RebalanceBufSize)
-	// register fetch channel
-	trans.Register(g.rel.fetCh)
 
 	// Set self as the chord delegate
 	conf.Ring.Delegate = g
@@ -85,10 +83,16 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 		kvlocal:  fsm,
 		kvremote: trans,
 	}
-	// Register key-value rpc
-	RegisterFidiasRPCServer(server, trans)
+
+	// Key rebalancer
+	g.rel = NewRelocator(conf, idx, trans)
 
 	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, logtrans)
+	if err == nil {
+		g.fet = newFetcher(conf, idx, entries, g.hexlog, g.trans)
+		// register fetch channel
+		trans.Register(g.fet.fetCh)
+	}
 
 	return
 }
@@ -98,16 +102,15 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 // registration, the rebalancing is started.
 func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
-	go fidias.rel.start()
+	fidias.fet.register(ring)
 }
 
-// NewEntry returns a new Entry for the given key from Hexalog. r is the number of replicas
-// to use.  If r is <=0 r is set to the default configured replication count.  It returns
-// an error if the node is not part of the location set or a lookup error occurs
-func (fidias *Fidias) NewEntry(key []byte, r int) (*hexatype.Entry, *ReMeta, error) {
+// NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
+// the node is not part of the location set or a lookup error occurs
+func (fidias *Fidias) NewEntry(key []byte) (*hexatype.Entry, *ReMeta, error) {
 
 	// Lookup locations for this key
-	locs, err := fidias.ring.LookupReplicated(key, r)
+	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Hexalog.Votes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -129,8 +132,25 @@ func (fidias *Fidias) NewEntry(key []byte, r int) (*hexatype.Entry, *ReMeta, err
 
 // ProposeEntry finds locations for the entry and submits a new proposal to those
 // locations.
-func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.Ballot, error) {
-	return fidias.hexlog.Propose(entry, opts)
+func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (ballot *hexalog.Ballot, err error) {
+	retries := int(opts.Retries)
+	if retries < 1 {
+		retries = 1
+	}
+
+	for i := 0; i < retries; i++ {
+		// Propose with retries.  Retry only if it is a ErrPreviousHash error
+		if ballot, err = fidias.hexlog.Propose(entry, opts); err == nil {
+			return
+		} else if err == hexatype.ErrPreviousHash {
+			time.Sleep(fidias.conf.RetryInterval)
+		} else {
+			return
+		}
+
+	}
+
+	return
 }
 
 // GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
@@ -158,11 +178,6 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReM
 	return
 }
 
-// Leader returns the leader of the given location set from the underlying log.
-func (fidias *Fidias) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.KeyLeader, error) {
-	return fidias.hexlog.Leader(key, locs)
-}
-
 // GetKey tries to get a key-value pair from a given replica set on the ring.  This is not
 // be confused with the log key.  It scours the first replica only.
 func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
@@ -173,6 +188,7 @@ func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMe
 	}
 	meta = &ReMeta{PeerSet: locs}
 
+	// Scour the leader replica range
 	_, err = fidias.ring.ScourReplica(locs[0].ID, func(vn *chord.Vnode) error {
 		if k, e := fidias.trans.GetKey(vn.Host, key); e == nil {
 			kvp = k
@@ -182,8 +198,8 @@ func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMe
 		return nil
 	})
 
+	// We found the entry.
 	if err == io.EOF {
-		// We found the entry.
 		err = nil
 	} else if kvp == nil {
 		err = hexatype.ErrKeyNotFound
@@ -192,6 +208,11 @@ func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMe
 	return
 }
 
+// Leader returns the leader of the given location set from the underlying log.
+func (fidias *Fidias) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.KeyLeader, error) {
+	return fidias.hexlog.Leader(key, locs)
+}
+
 func (fidias *Fidias) shutdownWait() {
-	fidias.rel.stop()
+	fidias.fet.stop()
 }
