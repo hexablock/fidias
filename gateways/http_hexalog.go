@@ -2,13 +2,10 @@ package gateways
 
 import (
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/hexablock/fidias"
-	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 )
 
 // handleHexalog serves http requests to get a keylog and add an entry to the keylog by key
@@ -20,48 +17,35 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	var (
-		host = server.conf.Hostname()
-		locs hexaring.LocationSet
-	)
+	//
+	// TODO: Make redirection a configurable in the request.
+	//
+	// var (
+	// 	host = server.conf.Hostname()
+	// 	locs hexaring.LocationSet
+	// )
 
-	if locs, err = server.ring.LookupReplicated([]byte(resourceID), server.conf.Replicas); err != nil {
-		return
-	}
+	// if locs, err = server.ring.LookupReplicated([]byte(resourceID), server.conf.Replicas); err != nil {
+	// 	return
+	// }
 
 	// Check if host is part of the location set otherwise re-direct to the natural vnode
 	//var loc *hexaring.Location
-	if _, err = locs.GetByHost(host); err != nil {
-		if strings.Contains(err.Error(), "host not in set") {
-			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, locs, r.RequestURI)
-		}
-		return
-	}
+	// if _, err = locs.GetByHost(host); err != nil {
+	// 	if strings.Contains(err.Error(), "host not in set") {
+	// 		code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, locs, r.RequestURI)
+	// 	}
+	// 	return
+	// }
 
 	switch r.Method {
 	case http.MethodGet:
-		code = 200
 		keid := strings.Split(resourceID, "/")
 
 		if len(keid) == 2 {
-			// Get a secific entry for a key
-			var id []byte
-			if id, err = hex.DecodeString(keid[1]); err == nil {
-				key := []byte(keid[0])
-				meta := &fidias.ReMeta{}
-				if data, meta, err = server.fids.GetEntry(key, id); err != nil {
-					code = 404
-				} else {
-					headers[headerLocations] = fmt.Sprintf("%s/%x", meta.Vnode.Host, meta.Vnode.Id)
-				}
-			}
+			code, data, err = server.handleGetEntry([]byte(keid[0]), keid[1])
 		} else {
-			// Get the keylog index only.
-			var keylog *hexalog.Keylog
-			if keylog, err = server.logstore.GetKey([]byte(resourceID)); err == nil {
-				data = keylog.GetIndex()
-			}
-
+			code, data, err = server.handleGetKeylog([]byte(resourceID))
 		}
 
 	default:
@@ -69,4 +53,29 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 	}
 
 	return
+}
+
+func (server *HTTPServer) handleGetKeylog(key []byte) (int, interface{}, error) {
+	keylog, err := server.logstore.GetKey(key)
+	if err == nil {
+		return 200, keylog.GetIndex(), nil
+	}
+	if err == hexatype.ErrKeyNotFound {
+		return 404, nil, err
+	}
+	return 400, nil, err
+}
+
+func (server *HTTPServer) handleGetEntry(key []byte, idstr string) (int, interface{}, error) {
+	id, err := hex.DecodeString(idstr)
+	if err != nil {
+		return 400, nil, err
+	}
+
+	code := 200
+	entry, err := server.logstore.GetEntry(key, id)
+	if err == hexatype.ErrEntryNotFound {
+		code = 404
+	}
+	return code, entry, err
 }

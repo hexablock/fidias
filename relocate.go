@@ -52,6 +52,7 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 		hashes := hexaring.BuildReplicaHashes(key, int64(reb.conf.Replicas), reb.conf.Hasher().New())
 		// Get location id for key based on local vnode
 		rid := getVnodeLocID(local.Id, hashes)
+
 		// Check if replica id is less than our new predecessor and add to list.
 		if bytes.Compare(rid, newPred.Id) <= 0 {
 			// Try to get last entry otherwise use the marker
@@ -63,6 +64,8 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 			kloc := &KeyLocation{Key: key, Marker: marker, Height: idx.Height()}
 			out = append(out, kloc)
 		}
+
+		// Move onto to the next
 		return nil
 	})
 

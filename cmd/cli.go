@@ -25,7 +25,7 @@ var (
 
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
-	hashFunc      = flag.String("hash", "SHA1", "Hash function to use [ SHA1 | SHA256 ]")
+	hashFunc      = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
 
 	showVersion = flag.Bool("version", false, "Show version")
 	debug       = flag.Bool("debug", false, "Turn on debug mode")
@@ -104,6 +104,7 @@ func configure() *fidias.Config {
 		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetLevel(log.LogLevelInfo)
+		log.SetPrefix(fmt.Sprintf("|%s| ", *advAddr))
 	}
 
 	// Set the hasher to sha256

@@ -1,9 +1,8 @@
 package fidias
 
 import (
-	"log"
-
-	chord "github.com/hexablock/go-chord"
+	"github.com/hexablock/go-chord"
+	"github.com/hexablock/log"
 )
 
 // NewPredecessor is called when a local vnode finds a new predecessor.  This causes a
@@ -12,24 +11,12 @@ import (
 func (fidias *Fidias) NewPredecessor(local, newPred, oldPred *chord.Vnode) {
 	fidias.keyblocks.set(newPred, local)
 
-	// if oldPred == nil {
-	// 	log.Printf("[INFO] Bootstrap pred=%s/%x vnode=%s/%x", newPred.Host, newPred.Id[:12],
-	// 		local.Host, local.Id[:12])
-	// } else {
-	// 	log.Printf("[INFO] Rebalance local=%s/%x %s/%x -> %s/%x", local.Host, local.Id[:12],
-	// 		oldPred.Host, oldPred.Id[:12], newPred.Host, newPred.Id[:12])
-	// }
-
 	// local-to-local rebalance.  Handle rebalancing data on the same local node
 	if local.Host == newPred.Host {
 		return
 	}
 
-	// Queue a rebalance
-	//fidias.reb.queue(NewRebalanceRequest(local, newPred, oldPred))
-	//
-
-	// Send keys that need to be relocated
+	// Send keys that need to be relocated.  This is a blocking call.
 	n, rt, err := fidias.rel.relocate(local, newPred)
 	if err != nil {
 		log.Printf("[ERROR] Relocation incomplete error='%v' src=%s/%x dst=%s/%x runtime=%v", err,

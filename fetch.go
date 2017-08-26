@@ -70,9 +70,6 @@ func (fet *fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureE
 		last = &hexatype.Entry{Key: key}
 	}
 
-	//log.Printf("[DEBUG] Fetching key=%s marker=%x last=%x src=%s/%x", key, marker, lid,vn.Host, vn.Id[:12])
-
-	//return reb.logtrans.remote.FetchKeylog(vn.Host, last, nil)
 	return fet.trans.remote.FetchKeylog(vn.Host, last, nil)
 }
 
@@ -89,12 +86,9 @@ func (fet *fetcher) fetchKeys() {
 				src.Id[:12], err)
 
 		}
-		// else {
-		// 	log.Printf("[DEBUG] Fetch complete key=%s marker=%x", kl.Key, kl.Marker)
-		// }
-
 		// Send key to be checked
 		fet.chkCh <- kl.Key
+
 	}
 
 	// close the check channel
@@ -103,56 +97,17 @@ func (fet *fetcher) fetchKeys() {
 	fet.stopped <- struct{}{}
 }
 
-// check all locations last hash for the given key.  submit a heal request if we are not
-// consistent with other locaitons
-func (fet *fetcher) checkKey(key []byte, locs hexaring.LocationSet) error {
-	leader, err := fet.hlog.Leader(key, locs)
-	if err != nil {
-		return err
-	}
-
-	// Skip if the node is not part of the location set
-	loc, err := locs.GetByHost(fet.conf.Hostname())
-	if err != nil {
-		//log.Printf("[DEBUG] Skipping check key=%s reason='%v'", key, err)
-		return nil
-	}
-
-	// nothing to do we are the leader
-	if leader.Location().Host() == loc.Host() {
-		return nil
-	}
-
-	// Compare the last entry ids for the leader and this node.
-
-	entries := leader.Entries()
-	sle := entries[loc.Priority]
-	lle := leader.LastEntry()
-
-	h := fet.conf.Hasher().New()
-	slh := sle.Hash(h)
-
-	h.Reset()
-	llh := lle.Hash(h)
-
-	if bytes.Compare(slh, llh) != 0 {
-		//return fmt.Errorf("mismatch %x != %x", slh, llh)
-		return fet.hlog.Heal(key, &hexatype.RequestOptions{PeerSet: locs})
-	}
-
-	return nil
-}
-
 func (fet *fetcher) checkKeys() {
 	for key := range fet.chkCh {
+
 		locs, err := fet.ring.LookupReplicated(key, fet.conf.Replicas)
 		if err != nil {
 			log.Printf("[ERROR] Key check failed key=%s error='%v'", key, err)
 			continue
 		}
 
-		if err := fet.checkKey(key, locs); err != nil {
-			log.Printf("[ERROR] Key check failed key=%s error='%v'", key, err)
+		if err = fet.hlog.Heal(key, &hexatype.RequestOptions{PeerSet: locs}); err != nil {
+			log.Printf("[ERROR] Heal failed key=%s error='%v'", key, err)
 		}
 
 	}
