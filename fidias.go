@@ -48,7 +48,8 @@ type Fidias struct {
 	shutdown chan struct{}
 }
 
-// New instantiates a new instance of Fidias based on the given config
+// New instantiates a new instance of Fidias based on the given config and stores along with
+// a grpc server instance to register the network transports
 func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.EntryStore, logStore *hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
 	// Init the FSM
 	var fsm KeyValueFSM
@@ -61,12 +62,10 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 	g = &Fidias{
 		conf:      conf,
 		keyblocks: newKeyBlockSet(),
-		shutdown:  make(chan struct{}, 1), // rebalancer
+		shutdown:  make(chan struct{}, 1), // relocator
 	}
-	// Fidias network transport
-	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Replicas,
-		conf.Hexalog.Hasher)
-	// Register key-value rpc
+	// Init fidias network transport
+	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Replicas, conf.Hexalog.Hasher)
 	RegisterFidiasRPCServer(server, trans)
 
 	// Init hexalog transport and register with gRPC
@@ -77,24 +76,30 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 	conf.Ring.Delegate = g
 
 	g.trans = &localTransport{
-		host:     conf.Hostname(),
-		local:    logStore,
-		remote:   logtrans,
-		kvlocal:  fsm,
-		kvremote: trans,
+		host:    conf.Hostname(),
+		local:   logStore,
+		remote:  logtrans,
+		kvlocal: fsm,
+		ftrans:  trans,
 	}
 
-	// Key rebalancer
-	g.rel = NewRelocator(conf, idx, trans)
-
-	g.hexlog, err = hexalog.NewHexalog(conf.Hexalog, fsm, logStore, stableStore, logtrans)
-	if err == nil {
-		g.fet = newFetcher(conf, idx, entries, g.hexlog, g.trans)
-		// register fetch channel
-		trans.Register(g.fet.fetCh)
-	}
-
+	err = g.initHexalog(fsm, idx, entries, stableStore)
 	return
+}
+
+func (fidias *Fidias) initHexalog(fsm KeyValueFSM, idx store.IndexStore, entries store.EntryStore, stable hexalog.StableStore) (err error) {
+	tr := fidias.trans
+	c := fidias.conf
+	fidias.rel = NewRelocator(fidias.conf, idx, tr.ftrans)
+	fidias.hexlog, err = hexalog.NewHexalog(c.Hexalog, fsm, tr.local, stable, tr.remote)
+	if err == nil {
+		// setup log entry fetcher
+		fidias.fet = newFetcher(c, idx, entries, fidias.hexlog, tr)
+		// register fetch channel
+		tr.ftrans.Register(fidias.fet.fetCh)
+	}
+
+	return err
 }
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the

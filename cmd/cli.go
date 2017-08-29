@@ -21,10 +21,10 @@ var (
 	bindAddr = flag.String("bind-addr", "127.0.0.1:32100", "Cluster bind address")
 	httpAddr = flag.String("http-addr", "127.0.0.1:7700", "HTTP bind address")
 	// Address used by http server for redirects
-	httpAdvAddr = flag.String("http-adv-addr", os.Getenv("FIDS_HTTP_ADV_ADDR"), "HTTP address to adversise [env FIDS_ADV_ADDR]")
+	httpAdvAddr = flag.String("http-adv-addr", os.Getenv("FIDS_HTTP_ADV_ADDR"), "HTTP address to adversise [env FIDS_HTTP_ADV_ADDR]")
 
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
-	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
+	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry joining")
 
 	hashFunc = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
 	dataDir  = flag.String("data-dir", "", "Path to data directory for persistence")

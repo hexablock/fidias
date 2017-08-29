@@ -12,12 +12,14 @@ type KVNetTransport interface {
 
 type localTransport struct {
 	host string
-	// hexalog local and remote
-	local  *hexalog.LogStore
+	// hexalog local
+	local *hexalog.LogStore
+	// hexalog remote
 	remote hexalog.Transport
-	// key-value local and remote
-	kvlocal  KeyValueFSM
-	kvremote KVNetTransport
+	// key-value local
+	kvlocal KeyValueFSM
+	// fidias transport as a whole. it contains the required key-value calls as well
+	ftrans *NetTransport
 }
 
 // GetEntry gets a local or remote entry based on host
@@ -40,5 +42,5 @@ func (trans *localTransport) GetKey(host string, key []byte) (*hexatype.KeyValue
 	if trans.host == host {
 		return trans.kvlocal.Get(key)
 	}
-	return trans.kvremote.GetKey(host, key)
+	return trans.ftrans.GetKey(host, key)
 }

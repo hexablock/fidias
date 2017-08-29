@@ -60,6 +60,12 @@ func main() {
 
 	checkAddrs()
 
+	if *dataDir == "" {
+		fmt.Printf("-data-dir required\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	// Configuration
 	conf := configure()
 	printStartBanner(conf)
@@ -72,10 +78,8 @@ func main() {
 	gserver := grpc.NewServer()
 
 	// Stores
-	datadir := filepath.Join("./tmp", conf.Hostname())
-	os.MkdirAll(datadir, 0755)
-	//datadir, _ := ioutil.TempDir("./tmp", "fidias")
-	index, entries, stable, err := setupStores(datadir)
+	os.MkdirAll(*dataDir, 0755)
+	index, entries, stable, err := setupStores(*dataDir)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to load stored: %v", err)
 	}
