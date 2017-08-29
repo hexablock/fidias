@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"io"
+	"log"
 	"time"
 
 	"golang.org/x/net/context"
@@ -101,9 +102,6 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 	if err := stream.RecvMsg(&preamble); err != nil {
 		return err
 	}
-	// Flip remote to avoid confusion
-	//self := preamble.Target
-	//src := preamble.Self
 
 	for {
 		keyLoc, err := stream.Recv()
@@ -116,16 +114,17 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 		}
 
 		// Create key if it does not exist
-		trans.idxs.UpsertKey(keyLoc.Key, keyLoc.Marker)
+		ki, err := trans.idxs.UpsertKey(keyLoc.Key, keyLoc.Marker)
+		if err != nil {
+			log.Printf("[ERROR] Failed to upsert key=%s error='%v'", keyLoc.Key, err)
+			continue
+		}
 
-		//hashes := hexaring.BuildReplicaHashes(keyLoc.Key, int64(trans.replicas), trans.hasher.New())
-		//rid := getVnodeLocID(self.Id, hashes)
-		//log.Printf("[TODO] Relocate marker=%x src=%s/%x target=%x height=%d key=%s", keyLoc.Marker,
-		//	src.Host, src.Id[:12], self.Id, keyLoc.Height, keyLoc.Key)
-
-		// TODO: submit to channel which will start building the log
-		trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
-
+		// Only continue relocating the key if the marker was set.  If the marker was not set
+		// it means we already have the marker entry and nothing needs to be done.
+		if ki.Marker() != nil {
+			trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
+		}
 	} // end loop
 
 }

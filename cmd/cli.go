@@ -25,7 +25,9 @@ var (
 
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry")
-	hashFunc      = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
+
+	hashFunc = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
+	dataDir  = flag.String("data-dir", "", "Path to data directory for persistence")
 
 	showVersion = flag.Bool("version", false, "Show version")
 	debug       = flag.Bool("debug", false, "Turn on debug mode")

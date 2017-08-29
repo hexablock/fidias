@@ -10,12 +10,12 @@ import (
 
 // Config hold the guac config along with the underlying log and ring config
 type Config struct {
-	Ring             *hexaring.Config
-	Hexalog          *hexalog.Config
-	RebalanceBufSize int           // Rebalance request buffer size
-	Replicas         int           // Number of replicas for a key
-	RetryInterval    time.Duration // interval to wait before retrying
-	StableThreshold  time.Duration // Threshold after ring event to consider we are stable
+	Ring            *hexaring.Config
+	Hexalog         *hexalog.Config
+	RelocateBufSize int           // Relocate request buffer size
+	Replicas        int           // Number of replicas for a key
+	RetryInterval   time.Duration // interval to wait before retrying a proposal
+	StableThreshold time.Duration // Threshold after ring event to consider we are stable
 }
 
 // Hostname returns the configured hostname. The assumption here is the log and ring
@@ -33,12 +33,12 @@ func (conf *Config) Hasher() hexatype.Hasher {
 // configs
 func DefaultConfig(hostname string) *Config {
 	cfg := &Config{
-		Replicas:         3,
-		RebalanceBufSize: 64,
-		Ring:             hexaring.DefaultConfig(hostname),
-		Hexalog:          hexalog.DefaultConfig(hostname),
-		StableThreshold:  5 * time.Minute,
-		RetryInterval:    10 * time.Millisecond,
+		Replicas:        3,
+		RelocateBufSize: 64,
+		Ring:            hexaring.DefaultConfig(hostname),
+		Hexalog:         hexalog.DefaultConfig(hostname),
+		StableThreshold: 5 * time.Minute,
+		RetryInterval:   10 * time.Millisecond,
 	}
 
 	return cfg

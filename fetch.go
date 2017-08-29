@@ -34,8 +34,8 @@ func newFetcher(conf *Config, idx store.IndexStore, ent store.EntryStore, hlog *
 		idx:     idx,
 		entries: ent,
 		trans:   trans,
-		fetCh:   make(chan *relocateReq, conf.RebalanceBufSize),
-		chkCh:   make(chan []byte, conf.RebalanceBufSize),
+		fetCh:   make(chan *relocateReq, conf.RelocateBufSize),
+		chkCh:   make(chan []byte, conf.RelocateBufSize),
 		stopped: make(chan struct{}, 2),
 	}
 }

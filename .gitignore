@@ -1,6 +1,8 @@
 dist
 fidiasd
 vendor
+tmp
+
 # Binaries for programs and plugins
 *.exe
 *.dll

@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -70,10 +72,14 @@ func main() {
 	gserver := grpc.NewServer()
 
 	// Stores
-	stableStore := &store.InMemStableStore{}
-	entries := store.NewInMemEntryStore()
-	idxStore := store.NewInMemIndexStore()
-	logStore := hexalog.NewLogStore(entries, idxStore, conf.Hexalog.Hasher)
+	datadir := filepath.Join("./tmp", conf.Hostname())
+	os.MkdirAll(datadir, 0755)
+	//datadir, _ := ioutil.TempDir("./tmp", "fidias")
+	index, entries, stable, err := setupStores(datadir)
+	if err != nil {
+		log.Fatalf("[ERROR] Failed to load stored: %v", err)
+	}
+	logStore := hexalog.NewLogStore(entries, index, conf.Hexalog.Hasher)
 
 	// Init hexaring
 	peers := hexaring.NewInMemPeerStore()
@@ -83,7 +89,7 @@ func main() {
 	fsm := fidias.NewInMemKeyValueFSM()
 
 	// Fidias
-	fids, err := fidias.New(conf, fsm, idxStore, entries, logStore, stableStore, gserver)
+	fids, err := fidias.New(conf, fsm, index, entries, logStore, stable, gserver)
 	if err != nil {
 		log.Fatal("[ERROR] Failed to initialize fidias:", err)
 	}
@@ -118,4 +124,30 @@ func addPeersToStore(peerStore hexaring.PeerStore, addrs string) {
 			peerStore.AddPeer(p)
 		}
 	}
+}
+
+func setupStores(baseDir string) (store.IndexStore, store.EntryStore, hexalog.StableStore, error) {
+	idir := filepath.Join(baseDir, "index")
+	edir := filepath.Join(baseDir, "entry")
+	//sdir := filepath.Join(baseDir, "stable")
+	os.MkdirAll(idir, 0755)
+	os.MkdirAll(edir, 0755)
+	//os.MkdirAll(sdir, 0755)
+
+	index := store.NewBadgerIndexStore(idir)
+	err := index.Open()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	entries := store.NewBadgerEntryStore(edir)
+	if err = entries.Open(); err != nil {
+		index.Close()
+		return nil, nil, nil, err
+	}
+
+	//stable := store.NewBadgerStableStore(sdir)
+	stable := &store.InMemStableStore{}
+
+	return index, entries, stable, nil
 }

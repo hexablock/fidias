@@ -13,6 +13,7 @@ clean:
 	go clean -i ./...
 	rm -f $(NAME)d
 	rm -rf dist
+	rm -rf tmp/*
 
 # Local platform build
 $(NAME)d:
