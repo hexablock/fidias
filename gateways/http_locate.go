@@ -23,10 +23,12 @@ func (server *HTTPServer) handleLocate(w http.ResponseWriter, r *http.Request, r
 			n = server.conf.Replicas
 		}
 
-		start := time.Now()
 		code = 200
+
+		start := time.Now()
 		data, err = server.ring.LookupReplicated([]byte(resourceID), n)
 		end := time.Since(start)
+
 		headers[headerLocateTime] = fmt.Sprintf("%v", end)
 
 	default:
