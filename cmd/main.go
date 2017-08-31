@@ -73,7 +73,7 @@ func main() {
 
 	// Stores
 	os.MkdirAll(*dataDir, 0755)
-	index, entries, stable, err := setupStores(*dataDir)
+	index, entries, stable, fsm, err := setupStores(*dataDir)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to load stored: %v", err)
 	}
@@ -82,9 +82,6 @@ func main() {
 	// Init hexaring
 	peers := hexaring.NewInMemPeerStore()
 	ring := hexaring.New(conf.Ring, peers, gserver)
-
-	// Application FSM
-	fsm := fidias.NewInMemKeyValueFSM()
 
 	// Fidias
 	fids, err := fidias.New(conf, fsm, index, entries, logStore, stable, gserver)
@@ -124,35 +121,43 @@ func addPeersToStore(peerStore hexaring.PeerStore, addrs string) {
 	}
 }
 
-func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore, stable hexalog.StableStore, err error) {
-
-	stable = &store.InMemStableStore{}
+func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore,
+	stable hexalog.StableStore, fsm fidias.KeyValueFSM, err error) {
 
 	if baseDir == "" {
 		log.Printf("[INFO] Using ephemeral storage")
 		index = store.NewInMemIndexStore()
 		entries = store.NewInMemEntryStore()
+		stable = &store.InMemStableStore{}
+		fsm = fidias.NewInMemKeyValueFSM()
 		return
 	}
 
 	log.Printf("[INFO] Using persistent storage")
 	idir := filepath.Join(baseDir, "index")
 	edir := filepath.Join(baseDir, "entry")
+	sdir := filepath.Join(baseDir, "stable")
+	fdir := filepath.Join(baseDir, "fsm")
 	os.MkdirAll(idir, 0755)
 	os.MkdirAll(edir, 0755)
+	os.MkdirAll(sdir, 0755)
+	os.MkdirAll(fdir, 0755)
 
 	idx := store.NewBadgerIndexStore(idir)
 	if err = idx.Open(); err != nil {
-		return nil, nil, nil, err
+		return
 	}
 	index = idx
 
 	ents := store.NewBadgerEntryStore(edir)
 	if err = ents.Open(); err != nil {
 		idx.Close()
-		return nil, nil, nil, err
+		return
 	}
 	entries = ents
+
+	fsm = fidias.NewBadgerKeyValueFSM(fdir)
+	stable = store.NewBadgerStableStore(sdir)
 
 	return
 }

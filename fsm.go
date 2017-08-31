@@ -1,10 +1,11 @@
 package fidias
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/dgraph-io/badger"
+	"github.com/golang/protobuf/proto"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -16,13 +17,9 @@ const (
 	OpDel
 )
 
-var (
-	errKeyNotFound = errors.New("key not found")
-)
-
-// InMemKeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the FSM
-// interface and provides a get function to retrieve keys as all write are handled by the
-// FSM
+// InMemKeyValueFSM is a hexalog FSM for an in-memory key-value store.  It implements the
+// FSM interface and provides a get function to retrieve keys as all write are handled by
+// the FSM
 type InMemKeyValueFSM struct {
 	mu sync.RWMutex
 	m  map[string]*hexatype.KeyValuePair
@@ -30,7 +27,13 @@ type InMemKeyValueFSM struct {
 
 // NewInMemKeyValueFSM inits a new InMemKeyValueFSM
 func NewInMemKeyValueFSM() *InMemKeyValueFSM {
-	return &InMemKeyValueFSM{m: make(map[string]*hexatype.KeyValuePair)}
+	return &InMemKeyValueFSM{}
+}
+
+// Open initialized the internal data structures.  It always returns nil
+func (fsm *InMemKeyValueFSM) Open() error {
+	fsm.m = make(map[string]*hexatype.KeyValuePair)
+	return nil
 }
 
 // Get gets a value for the key.  It reads it directly from the stored log entry
@@ -42,7 +45,7 @@ func (fsm *InMemKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
 	if ok {
 		return value, nil
 	}
-	return nil, errKeyNotFound
+	return nil, hexatype.ErrKeyNotFound
 }
 
 // Apply applies the given entry to the InMemKeyValueFSM.  entryID is the hash id of the entry.
@@ -94,6 +97,11 @@ func (fsm *InMemKeyValueFSM) applyDelete(key string) error {
 	return nil
 }
 
+// Close is a no-op to satisfy the KeyValueFSM interface
+func (fsm *InMemKeyValueFSM) Close() error {
+	return nil
+}
+
 // DummyFSM is a placeholder FSM that does nothing
 type DummyFSM struct{}
 
@@ -105,7 +113,108 @@ func (fsm *DummyFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	return nil
 }
 
+// Open is a no-op to satisfy the KeyValueFSM interface
+func (fsm *DummyFSM) Open() error {
+	return nil
+}
+
 // Get is a noop to satisfy the KeyValueFSM interface
 func (fsm *DummyFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
 	return nil, fmt.Errorf("dummy fsm")
+}
+
+// Close is a no-op to satisfy the KeyValueFSM interface
+func (fsm *DummyFSM) Close() error {
+	return nil
+}
+
+// BadgerKeyValueFSM implements a badger backed KeyValueFSM
+type BadgerKeyValueFSM struct {
+	opt *badger.Options
+	kv  *badger.KV
+}
+
+// NewBadgerKeyValueFSM inits a new BadgerKeyValueFSM
+func NewBadgerKeyValueFSM(dataDir string) *BadgerKeyValueFSM {
+	opt := new(badger.Options)
+	*opt = badger.DefaultOptions
+	opt.Dir = dataDir
+	opt.ValueDir = dataDir
+
+	// TODO: handle this a better way
+	opt.SyncWrites = true
+
+	return &BadgerKeyValueFSM{opt: opt}
+}
+
+// Open opens the store for reading and writing.  This must be called before the FSM
+// can be used.
+func (fsm *BadgerKeyValueFSM) Open() (err error) {
+	fsm.kv, err = badger.NewKV(fsm.opt)
+	return
+}
+
+// Get gets a value for the key.  It reads it directly from the stored log entry
+func (fsm *BadgerKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
+	var item badger.KVItem
+	err := fsm.kv.Get(key, &item)
+	if err != nil {
+		return nil, err
+	}
+
+	val := item.Value()
+	if val == nil {
+		return nil, hexatype.ErrKeyNotFound
+	}
+
+	var kvp hexatype.KeyValuePair
+	err = proto.Unmarshal(val, &kvp)
+	return &kvp, err
+}
+
+// Apply applies the given entry to the BadgerKeyValueFSM.  entryID is the hash id of the entry.
+// The first byte in entry.Data contains the operation to be performed followed by the
+// actual value.
+func (fsm *BadgerKeyValueFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
+	if entry.Data == nil || len(entry.Data) == 0 {
+		return nil
+	}
+
+	var (
+		op   = entry.Data[0]
+		resp interface{}
+	)
+
+	switch op {
+	case OpSet:
+		resp = fsm.applySet(entry.Key, entry.Data[1:], entry)
+
+	case OpDel:
+		resp = fsm.applyDelete(entry.Key)
+
+	default:
+		resp = fmt.Errorf("invalid operation: %x", op)
+
+	}
+
+	return resp
+}
+
+func (fsm *BadgerKeyValueFSM) applySet(key, value []byte, entry *hexatype.Entry) error {
+	kv := &hexatype.KeyValuePair{Entry: entry, Value: value, Key: key}
+	val, err := proto.Marshal(kv)
+	if err == nil {
+		err = fsm.kv.Set(key, val, 0)
+	}
+
+	return err
+}
+
+func (fsm *BadgerKeyValueFSM) applyDelete(key []byte) error {
+	return fsm.kv.Delete(key)
+}
+
+// Close closes the underlying badger store
+func (fsm *BadgerKeyValueFSM) Close() error {
+	return fsm.kv.Close()
 }

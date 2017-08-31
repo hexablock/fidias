@@ -17,7 +17,9 @@ import (
 // contains read-only key-value functions needed.
 type KeyValueFSM interface {
 	hexalog.FSM
+	Open() error
 	Get(key []byte) (*hexatype.KeyValuePair, error)
+	Close() error
 }
 
 // ReMeta contains metadata associated to a request or response
@@ -37,6 +39,8 @@ type Fidias struct {
 	trans *localTransport
 	// Overall log manager
 	hexlog *hexalog.Hexalog
+	// FSM
+	fsm KeyValueFSM
 	// Blocks of keys this node is responsible for. These are the local vnodes and their
 	// respective predecessors
 	keyblocks *keyBlockSet
@@ -59,8 +63,14 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 		fsm = appFSM
 	}
 
+	// Open the fsm to begin using it
+	if err = fsm.Open(); err != nil {
+		return nil, err
+	}
+
 	g = &Fidias{
 		conf:      conf,
+		fsm:       fsm,
 		keyblocks: newKeyBlockSet(),
 		shutdown:  make(chan struct{}, 1), // relocator
 	}
