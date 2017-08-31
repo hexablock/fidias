@@ -130,28 +130,35 @@ func addPeersToStore(peerStore hexaring.PeerStore, addrs string) {
 	}
 }
 
-func setupStores(baseDir string) (store.IndexStore, store.EntryStore, hexalog.StableStore, error) {
+func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore, stable hexalog.StableStore, err error) {
+
+	stable = &store.InMemStableStore{}
+
+	if baseDir == "" {
+		log.Printf("[INFO] Using ephemeral storage")
+		index = store.NewInMemIndexStore()
+		entries = store.NewInMemEntryStore()
+		return
+	}
+
+	log.Printf("[INFO] Using persistent storage")
 	idir := filepath.Join(baseDir, "index")
 	edir := filepath.Join(baseDir, "entry")
-	//sdir := filepath.Join(baseDir, "stable")
 	os.MkdirAll(idir, 0755)
 	os.MkdirAll(edir, 0755)
-	//os.MkdirAll(sdir, 0755)
 
-	index := store.NewBadgerIndexStore(idir)
-	err := index.Open()
-	if err != nil {
+	idx := store.NewBadgerIndexStore(idir)
+	if err = idx.Open(); err != nil {
 		return nil, nil, nil, err
 	}
+	index = idx
 
-	entries := store.NewBadgerEntryStore(edir)
-	if err = entries.Open(); err != nil {
-		index.Close()
+	ents := store.NewBadgerEntryStore(edir)
+	if err = ents.Open(); err != nil {
+		idx.Close()
 		return nil, nil, nil, err
 	}
+	entries = ents
 
-	//stable := store.NewBadgerStableStore(sdir)
-	stable := &store.InMemStableStore{}
-
-	return index, entries, stable, nil
+	return
 }
