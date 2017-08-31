@@ -27,7 +27,7 @@ var (
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry joining")
 
 	hashFunc = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
-	dataDir  = flag.String("data-dir", "", "Path to data directory for persistence")
+	dataDir  = flag.String("data-dir", os.Getenv("FIDS_DATA_DIR"), "Path to data directory for persistence [env FIDS_DATA_DIR]")
 
 	showVersion = flag.Bool("version", false, "Show version")
 	debug       = flag.Bool("debug", false, "Turn on debug mode")
