@@ -54,13 +54,13 @@ func (trans *NetTransport) Register(ch chan<- *relocateReq) {
 }
 
 // GetKey retrieves a key from a remote host
-func (trans *NetTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
+func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error) {
 	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	kvp, err := conn.client.GetKeyRPC(context.Background(), &hexatype.KeyValuePair{Key: key})
+	kvp, err := conn.client.GetKeyRPC(ctx, &hexatype.KeyValuePair{Key: key})
 	if err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}

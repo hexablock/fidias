@@ -1,6 +1,9 @@
 package fidias
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
@@ -38,9 +41,15 @@ func (trans *localTransport) LastEntry(host string, key []byte) (*hexatype.Entry
 }
 
 // GetKey gets a local or remote key-value pair based on the host
-func (trans *localTransport) GetKey(host string, key []byte) (*hexatype.KeyValuePair, error) {
+func (trans *localTransport) GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error) {
 	if trans.host == host {
-		return trans.kvlocal.Get(key)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("GetKey context cancelled")
+		default:
+			return trans.kvlocal.Get(key)
+		}
+		//return trans.kvlocal.Get(key)
 	}
-	return trans.ftrans.GetKey(host, key)
+	return trans.ftrans.GetKey(ctx, host, key)
 }

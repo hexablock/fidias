@@ -51,10 +51,10 @@ func (server *HTTPServer) handleGetKey(resourceID string, n int, reqURI string) 
 func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []byte, reqURI string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = map[string]string{}
 
-	entry, meta, err := server.fids.NewEntry([]byte(resourceID))
+	entry, opts, err := server.fids.NewEntry([]byte(resourceID))
 	if err != nil {
 		if strings.Contains(err.Error(), "host not in set") {
-			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, meta.PeerSet, reqURI)
+			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, opts.PeerSet, reqURI)
 		}
 		return
 	}
@@ -62,10 +62,9 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 	entry.Data = append([]byte{op}, reqData...)
 	code = 200
 
-	var (
-		ballot *hexalog.Ballot
-		opts   = &hexatype.RequestOptions{PeerSet: meta.PeerSet, Retries: 2}
-	)
+	opts.Retries = 2
+
+	var ballot *hexalog.Ballot
 
 	ballot, err = server.fids.ProposeEntry(entry, opts)
 	if err != nil {
@@ -74,7 +73,7 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 
 	if err = ballot.Wait(); err == nil {
 		data = ballot.Future()
-		headers[headerLocations] = locationSetHeaderVals(meta.PeerSet)
+		headers[headerLocations] = locationSetHeaderVals(opts.PeerSet)
 	}
 
 	// Runtime headers

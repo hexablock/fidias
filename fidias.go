@@ -1,6 +1,7 @@
 package fidias
 
 import (
+	"fmt"
 	"io"
 	"time"
 
@@ -122,27 +123,26 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 
 // NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
 // the node is not part of the location set or a lookup error occurs
-func (fidias *Fidias) NewEntry(key []byte) (*hexatype.Entry, *ReMeta, error) {
-
+func (fidias *Fidias) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 	// Lookup locations for this key
 	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Hexalog.Votes)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	meta := &ReMeta{PeerSet: locs}
-
-	//
-	// TODO: Optimize ???
-	//
-
-	//var self *hexaring.Location
-	if _, err = locs.GetByHost(fidias.conf.Hostname()); err != nil {
-		return nil, meta, err
+	// Check and set source index
+	opt := &hexatype.RequestOptions{SourceIndex: -1, PeerSet: locs}
+	for i, v := range locs {
+		if v.Host() == fidias.conf.Hostname() {
+			opt.SourceIndex = int32(i)
+			break
+		}
+	}
+	if opt.SourceIndex < 0 {
+		return nil, opt, fmt.Errorf("host not in set: %s", fidias.conf.Hostname())
 	}
 
-	entry := fidias.hexlog.New(key)
-	return entry, meta, nil
+	return fidias.hexlog.New(key), opt, nil
 }
 
 // ProposeEntry finds locations for the entry and submits a new proposal to those
@@ -188,36 +188,6 @@ func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReM
 		err = nil
 	} else if entry == nil {
 		err = hexatype.ErrEntryNotFound
-	}
-
-	return
-}
-
-// GetKey tries to get a key-value pair from a given replica set on the ring.  This is not
-// be confused with the log key.  It scours the first replica only.
-func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
-
-	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Replicas)
-	if err != nil {
-		return nil, nil, err
-	}
-	meta = &ReMeta{PeerSet: locs}
-
-	// Scour the leader replica range
-	_, err = fidias.ring.ScourReplica(locs[0].ID, func(vn *chord.Vnode) error {
-		if k, e := fidias.trans.GetKey(vn.Host, key); e == nil {
-			kvp = k
-			meta.Vnode = vn
-			return io.EOF
-		}
-		return nil
-	})
-
-	// We found the entry.
-	if err == io.EOF {
-		err = nil
-	} else if kvp == nil {
-		err = hexatype.ErrKeyNotFound
 	}
 
 	return

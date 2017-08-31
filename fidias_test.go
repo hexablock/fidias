@@ -1,6 +1,7 @@
 package fidias
 
 import (
+	"bytes"
 	"net"
 	"testing"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
-	"github.com/hexablock/hexatype"
 )
 
 type testServer struct {
@@ -53,8 +53,9 @@ func newTestServer(addr string, peers ...string) (*testServer, error) {
 	ss := &store.InMemStableStore{}
 	es := store.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
+	fsm := NewInMemKeyValueFSM()
 
-	ts.fids, err = New(ts.c, nil, idx, es, ls, ss, ts.g)
+	ts.fids, err = New(ts.c, fsm, idx, es, ls, ss, ts.g)
 	if err != nil {
 		return nil, err
 	}
@@ -86,44 +87,59 @@ func TestFidias(t *testing.T) {
 	}
 	<-time.After(100 * time.Millisecond)
 
-	ts3, err := newTestServer("127.0.0.1:61236", "127.0.0.1:61234")
+	ts3, err := newTestServer("127.0.0.1:61236", "127.0.0.1:61235")
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-time.After(100 * time.Millisecond)
+	<-time.After(300 * time.Millisecond)
 
 	testkey1 := []byte("testkey1")
-
 	_, _, err = ts1.fids.NewEntry(testkey1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	entry, remeta, err := ts2.fids.NewEntry(testkey1)
+	entry, opt, err := ts2.fids.NewEntry(testkey1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//&hexatype.RequestOptions{PeerSet: remeta.PeerSet}
+	ballot, err := ts3.fids.ProposeEntry(entry, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = ts3.fids.ProposeEntry(entry, &hexatype.RequestOptions{PeerSet: remeta.PeerSet}); err != nil {
+	if err = ballot.Wait(); err != nil {
 		t.Fatal(err)
 	}
 
+	fe := ballot.Future()
+	if _, err = fe.Wait(1 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	id := entry.Hash(ts2.c.Hasher().New())
+	if _, _, err = ts2.fids.GetEntry(entry.Key, id); err != nil {
+		t.Fatal(err)
+	}
+
+	ki, err := ts3.fids.trans.local.GetKey(entry.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kidx := ki.GetIndex()
+	if bytes.Compare(kidx.Last(), id) != 0 {
+		t.Fatal("id mismatch")
+	}
+
+	// New node joining
 	<-time.After(10 * time.Millisecond)
 	ts4, err := newTestServer("127.0.0.1:61237", "127.0.0.1:61234")
 	if err != nil {
 		t.Fatal(err)
 	}
 	<-time.After(200 * time.Millisecond)
-
-	// locs, err := ts4.fids.ring.LookupReplicated(testkey1, 3)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// err = ts4.fids.fet.checkKey(testkey1, locs)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
 
 	ts1.fids.shutdownWait()
 	ts2.fids.shutdownWait()
