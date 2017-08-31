@@ -60,12 +60,6 @@ func main() {
 
 	checkAddrs()
 
-	if *dataDir == "" {
-		fmt.Printf("-data-dir required\n\n")
-		flag.Usage()
-		os.Exit(1)
-	}
-
 	// Configuration
 	conf := configure()
 	printStartBanner(conf)
