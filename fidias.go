@@ -76,7 +76,7 @@ func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.E
 		shutdown:  make(chan struct{}, 1), // relocator
 	}
 	// Init fidias network transport
-	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Replicas, conf.Hexalog.Hasher)
+	trans := NewNetTransport(fsm, idx, 30*time.Second, conf.Ring.MaxConnIdle, conf.Hexalog.Votes, conf.Hexalog.Hasher)
 	RegisterFidiasRPCServer(server, trans)
 
 	// Init hexalog transport and register with gRPC
@@ -154,7 +154,7 @@ func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.Request
 	}
 
 	for i := 0; i < retries; i++ {
-		// Propose with retries.  Retry only if it is a ErrPreviousHash error
+		// Propose with retries.  Retry only on a ErrPreviousHash error
 		if ballot, err = fidias.hexlog.Propose(entry, opts); err == nil {
 			return
 		} else if err == hexatype.ErrPreviousHash {
@@ -172,7 +172,7 @@ func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.Request
 // upto the max allowed successors for each location.
 func (fidias *Fidias) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReMeta, err error) {
 	meta = &ReMeta{}
-	_, err = fidias.ring.ScourReplicatedKey(key, fidias.conf.Replicas, func(vn *chord.Vnode) error {
+	_, err = fidias.ring.ScourReplicatedKey(key, fidias.conf.Hexalog.Votes, func(vn *chord.Vnode) error {
 		ent, er := fidias.trans.GetEntry(vn.Host, key, id)
 		if er == nil {
 			entry = ent

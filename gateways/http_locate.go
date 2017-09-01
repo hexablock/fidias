@@ -20,7 +20,7 @@ func (server *HTTPServer) handleLocate(w http.ResponseWriter, r *http.Request, r
 		}
 		// Set default if not provided
 		if n == 0 {
-			n = server.conf.Replicas
+			n = server.conf.Hexalog.Votes
 		}
 
 		code = 200

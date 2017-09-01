@@ -65,7 +65,6 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 	opts.Retries = 2
 
 	var ballot *hexalog.Ballot
-
 	ballot, err = server.fids.ProposeEntry(entry, opts)
 	if err != nil {
 		return
@@ -94,7 +93,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	if n == 0 {
-		n = server.conf.Replicas
+		n = server.conf.Hexalog.Votes
 	}
 
 	code = 200

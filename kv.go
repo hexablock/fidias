@@ -15,7 +15,7 @@ type kvitemError struct {
 
 // GetKey gets a given key from possible locations
 func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
-	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Replicas)
+	locs, err := fidias.ring.LookupReplicated(key, fidias.conf.Hexalog.Votes)
 	if err != nil {
 		return nil, nil, err
 	}

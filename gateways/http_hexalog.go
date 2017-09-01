@@ -17,27 +17,6 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	//
-	// TODO: Make redirection a configurable in the request.
-	//
-	// var (
-	// 	host = server.conf.Hostname()
-	// 	locs hexaring.LocationSet
-	// )
-
-	// if locs, err = server.ring.LookupReplicated([]byte(resourceID), server.conf.Replicas); err != nil {
-	// 	return
-	// }
-
-	// Check if host is part of the location set otherwise re-direct to the natural vnode
-	//var loc *hexaring.Location
-	// if _, err = locs.GetByHost(host); err != nil {
-	// 	if strings.Contains(err.Error(), "host not in set") {
-	// 		code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, locs, r.RequestURI)
-	// 	}
-	// 	return
-	// }
-
 	switch r.Method {
 	case http.MethodGet:
 		keid := strings.Split(resourceID, "/")

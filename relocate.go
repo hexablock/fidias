@@ -49,7 +49,7 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 	out := make([]*KeyLocation, 0)
 	reb.idx.Iter(func(key []byte, idx store.KeylogIndex) error {
 		// get replica hashes for a key including natural hash
-		hashes := hexaring.BuildReplicaHashes(key, int64(reb.conf.Replicas), reb.conf.Hasher().New())
+		hashes := hexaring.BuildReplicaHashes(key, int64(reb.conf.Hexalog.Votes), reb.conf.Hasher().New())
 		// Get location id for key based on local vnode
 		rid := getVnodeLocID(local.Id, hashes)
 

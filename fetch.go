@@ -100,7 +100,7 @@ func (fet *fetcher) fetchKeys() {
 func (fet *fetcher) checkKeys() {
 	for key := range fet.chkCh {
 
-		locs, err := fet.ring.LookupReplicated(key, fet.conf.Replicas)
+		locs, err := fet.ring.LookupReplicated(key, fet.conf.Hexalog.Votes)
 		if err != nil {
 			log.Printf("[ERROR] Key check failed key=%s error='%v'", key, err)
 			continue

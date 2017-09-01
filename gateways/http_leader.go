@@ -19,7 +19,7 @@ func (server *HTTPServer) handleLeader(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	if n == 0 {
-		n = server.conf.Replicas
+		n = server.conf.Hexalog.Votes
 	}
 
 	var locs hexaring.LocationSet

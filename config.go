@@ -13,7 +13,6 @@ type Config struct {
 	Ring            *hexaring.Config
 	Hexalog         *hexalog.Config
 	RelocateBufSize int           // Relocate request buffer size
-	Replicas        int           // Number of replicas for a key
 	RetryInterval   time.Duration // interval to wait before retrying a proposal
 	StableThreshold time.Duration // Threshold after ring event to consider we are stable
 }
@@ -33,7 +32,6 @@ func (conf *Config) Hasher() hexatype.Hasher {
 // configs
 func DefaultConfig(hostname string) *Config {
 	cfg := &Config{
-		Replicas:        3,
 		RelocateBufSize: 64,
 		Ring:            hexaring.DefaultConfig(hostname),
 		Hexalog:         hexalog.DefaultConfig(hostname),
