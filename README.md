@@ -40,30 +40,39 @@ The default cluster requires a minimum of 3 nodes to function though this can be
 $ curl -XGET http://127.0.0.1:9090/v1/locate/testkey
 [
   {
-    "ID": "913a73b565c8e2c8ed94497580f619397709b8b6",
+    "ID": "7af630cfe6d6c180dc56caabc76c36965185eabbd71c0a0b4ef800298d147816",
     "Priority": 0,
+    "Index": 0,
     "Vnode": {
-      "Host": "127.0.0.1:54322",
-      "Id": "93bb6a44e8e8922afe0dbcbba3a1ed3eaa859850",
-      "Meta": "http=127.0.0.1:9091"
+      "ID": "7d9b8af0cdd93e56e846a13435453525e6a88568474c53675a6084a3d0ad1886",
+      "Host": "172.19.0.7:32100",
+      "Meta": {
+        "http": "127.0.0.1:7700"
+      }
     }
   },
   {
-    "ID": "e68fc90abb1e381e42e99ecad64b6e8ecc5f0e0b",
+    "ID": "d04b86253c2c16d631ac20011cc18beba6db40112c715f60a44d557ee269cd6b",
     "Priority": 1,
+    "Index": 0,
     "Vnode": {
-      "Host": "127.0.0.1:54323",
-      "Id": "2209bd42504b643b3acfd7e6599699c7a53d962d",
-      "Meta": "http=127.0.0.1:9092"
+      "ID": "d09c14c4e817d5584cda42d1d60fb389c87067ab712f1a91d9e243ff6696c393",
+      "Host": "172.19.0.8:32100",
+      "Meta": {
+        "http": "127.0.0.1:7703"
+      }
     }
   },
   {
-    "ID": "3be51e6010738d73983ef4202ba0c3e421b46360",
+    "ID": "25a0db7a91816c2b870175567216e140fc30956681c6b4b5f9a2aad437bf22c0",
     "Priority": 2,
+    "Index": 2,
     "Vnode": {
-      "Host": "127.0.0.1:54321",
-      "Id": "591c0a39be4478ce77124239189bab225a73de75",
-      "Meta": "http=127.0.0.1:9090"
+      "ID": "4aef6d0fe81410d02859717b124e52971d28eb3f4b3eba3cf1c4c5f579a3594e",
+      "Host": "172.19.0.2:32100",
+      "Meta": {
+        "http": "127.0.0.1:7705"
+      }
     }
   }
 ]
@@ -78,6 +87,5 @@ The cluster is now running and can be used.  Details on the HTTP API can be foun
 
 Coming Soon!!
 
-- Persistence
-- Locking mechanisms
 - Authentication, Authorization and Access
+- Locking mechanisms

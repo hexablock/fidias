@@ -7,9 +7,12 @@ import (
 	baselog "log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hexablock/fidias"
+	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -132,4 +135,45 @@ func printStartBanner(conf *fidias.Config) {
   Vnodes    : %d
 
 `, version, *advAddr, *bindAddr, *httpAddr, conf.Hexalog.Hasher.Algorithm(), conf.Ring.NumVnodes)
+}
+
+func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore,
+	stable hexalog.StableStore, fsm fidias.KeyValueFSM, err error) {
+
+	if baseDir == "" {
+		log.Printf("[INFO] Using ephemeral storage: in-memory")
+		index = store.NewInMemIndexStore()
+		entries = store.NewInMemEntryStore()
+		stable = &store.InMemStableStore{}
+		fsm = fidias.NewInMemKeyValueFSM()
+		return
+	}
+
+	log.Printf("[INFO] Using persistent storage: badger")
+	idir := filepath.Join(baseDir, "index")
+	edir := filepath.Join(baseDir, "entry")
+	sdir := filepath.Join(baseDir, "stable")
+	fdir := filepath.Join(baseDir, "fsm")
+	os.MkdirAll(idir, 0755)
+	os.MkdirAll(edir, 0755)
+	os.MkdirAll(sdir, 0755)
+	os.MkdirAll(fdir, 0755)
+
+	idx := store.NewBadgerIndexStore(idir)
+	if err = idx.Open(); err != nil {
+		return
+	}
+	index = idx
+
+	ents := store.NewBadgerEntryStore(edir)
+	if err = ents.Open(); err != nil {
+		idx.Close()
+		return
+	}
+	entries = ents
+
+	fsm = fidias.NewBadgerKeyValueFSM(fdir)
+	stable = store.NewBadgerStableStore(sdir)
+
+	return
 }
