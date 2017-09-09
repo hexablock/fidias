@@ -85,7 +85,16 @@ The cluster is now running and can be used.  Details on the HTTP API can be foun
 
 ### Roadmap
 
-Coming Soon!!
+- 0.4.0
+  - Authorization
+- 0.3.0
+  - Locking mechanisms
+  - Initial authorization framework
+- 0.2.0
+  - Authentication
 
-- Authentication, Authorization and Access
-- Locking mechanisms
+### Known Issues
+
+- When using fidias in docker on a Mac with persistent storage, a massive performance hit
+is incurred due to the way docker volumes and persistence are managed by docker on a Mac.
+This is only pertinent for Macs

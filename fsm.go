@@ -162,7 +162,17 @@ func (fsm *BadgerKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
 		return nil, err
 	}
 
-	val := item.Value()
+	var val []byte
+
+	err = item.Value(func(v []byte) {
+		if v != nil {
+			val = make([]byte, len(v))
+			copy(val, v)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
 	if val == nil {
 		return nil, hexatype.ErrKeyNotFound
 	}
