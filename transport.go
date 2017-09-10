@@ -9,9 +9,9 @@ import (
 )
 
 // KVNetTransport implements a network transport for key-value operations
-type KVNetTransport interface {
-	GetKey(host string, key []byte) (*hexatype.KeyValuePair, error)
-}
+// type KVNetTransport interface {
+// 	GetKey(host string, key []byte) (*hexatype.KeyValuePair, error)
+// }
 
 type localTransport struct {
 	host string

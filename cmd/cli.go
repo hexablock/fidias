@@ -5,14 +5,9 @@ import (
 	"fmt"
 	"hash"
 	baselog "log"
-	"net"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/hexablock/fidias"
-	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -23,7 +18,7 @@ var (
 	// This is what the cluster listen on i.e. can accept connections on this address space
 	bindAddr = flag.String("bind-addr", "127.0.0.1:32100", "Cluster bind address")
 	httpAddr = flag.String("http-addr", "127.0.0.1:7700", "HTTP bind address")
-	// Address used by http server for redirects
+	// Address used by http server for redirects.  This is what is published in the meta for a vnode
 	httpAdvAddr = flag.String("http-adv-addr", os.Getenv("FIDS_HTTP_ADV_ADDR"), "HTTP address to adversise [env FIDS_HTTP_ADV_ADDR]")
 
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
@@ -52,41 +47,6 @@ func checkAddrs() {
 		os.Exit(1)
 	}
 	*httpAdvAddr = hAdv
-}
-
-// given a advertise and bind address return the advertise addr or an error
-func buildAdvertiseAddr(a, b string) (adv string, err error) {
-	var addr string
-	if a != "" {
-		addr = a
-	} else {
-		// Used bind if adv is not supplied
-		addr = b
-	}
-
-	parts := strings.Split(addr, ":")
-	l := len(parts)
-	if l > 1 {
-		l--
-		// Parse addr to make sure it is a usable ip address
-		host := strings.Join(parts[:l], ":")
-		var ipaddr *net.IPAddr
-		ipaddr, err = net.ResolveIPAddr("ip", host)
-		if err == nil {
-			ip := ipaddr.String()
-			port := parts[l]
-			if port != "" && ip != "0.0.0.0" && ip != "::" && ip != "0:0:0:0:0:0:0:0" {
-				adv = ip + ":" + port
-				return
-			}
-
-		} else {
-			return
-		}
-	}
-
-	err = fmt.Errorf("Invalid advertise address: %s", addr)
-	return
 }
 
 func configure() *fidias.Config {
@@ -135,45 +95,4 @@ func printStartBanner(conf *fidias.Config) {
   Vnodes    : %d
 
 `, version, *advAddr, *bindAddr, *httpAddr, conf.Hexalog.Hasher.Algorithm(), conf.Ring.NumVnodes)
-}
-
-func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore,
-	stable hexalog.StableStore, fsm fidias.KeyValueFSM, err error) {
-
-	if baseDir == "" {
-		log.Printf("[INFO] Using ephemeral storage: in-memory")
-		index = store.NewInMemIndexStore()
-		entries = store.NewInMemEntryStore()
-		stable = &store.InMemStableStore{}
-		fsm = fidias.NewInMemKeyValueFSM()
-		return
-	}
-
-	log.Printf("[INFO] Using persistent storage: badger")
-	idir := filepath.Join(baseDir, "index")
-	edir := filepath.Join(baseDir, "entry")
-	sdir := filepath.Join(baseDir, "stable")
-	fdir := filepath.Join(baseDir, "fsm")
-	os.MkdirAll(idir, 0755)
-	os.MkdirAll(edir, 0755)
-	os.MkdirAll(sdir, 0755)
-	os.MkdirAll(fdir, 0755)
-
-	idx := store.NewBadgerIndexStore(idir)
-	if err = idx.Open(); err != nil {
-		return
-	}
-	index = idx
-
-	ents := store.NewBadgerEntryStore(edir)
-	if err = ents.Open(); err != nil {
-		idx.Close()
-		return
-	}
-	entries = ents
-
-	fsm = fidias.NewBadgerKeyValueFSM(fdir)
-	stable = store.NewBadgerStableStore(sdir)
-
-	return
 }

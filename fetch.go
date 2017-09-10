@@ -46,7 +46,7 @@ func (fet *fetcher) register(ring *hexaring.Ring) {
 }
 
 // fetch fetches a keylog from the given vnode.  If the last entry and marker match then
-// fetching is performed.
+// fetching is not performed.
 func (fet *fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureEntry, error) {
 	keyidx, err := fet.idx.GetKey(key)
 	if err != nil {

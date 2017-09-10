@@ -145,8 +145,8 @@ func (fidias *Fidias) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOp
 	return fidias.hexlog.New(key), opt, nil
 }
 
-// ProposeEntry finds locations for the entry and submits a new proposal to those
-// locations.
+// ProposeEntry finds locations for the entry and proposes it to those locations.  It retries the specified number of times
+// before returning.  It returns a ballot that can be waited on for the entry to be applied or an error
 func (fidias *Fidias) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (ballot *hexalog.Ballot, err error) {
 	retries := int(opts.Retries)
 	if retries < 1 {

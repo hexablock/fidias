@@ -61,7 +61,12 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 				marker = idx.Marker()
 			}
 
-			kloc := &KeyLocation{Key: key, Marker: marker, Height: idx.Height()}
+			kloc := &KeyLocation{
+				Key:    key,
+				Marker: marker,
+				Height: idx.Height(),
+			}
+
 			out = append(out, kloc)
 		}
 

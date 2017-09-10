@@ -53,6 +53,7 @@ func (server *HTTPServer) handleWriteKey(resourceID string, op byte, reqData []b
 
 	entry, opts, err := server.fids.NewEntry([]byte(resourceID))
 	if err != nil {
+		// Redirect to appropriate host
 		if strings.Contains(err.Error(), "host not in set") {
 			code, headers, data, err = checkHostNotInSetErrorOrRedirect(err, opts.PeerSet, reqURI)
 		}
