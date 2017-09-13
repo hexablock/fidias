@@ -36,8 +36,8 @@ func (fsm *InMemKeyValueFSM) Open() error {
 	return nil
 }
 
-// Get gets a value for the key.  It reads it directly from the stored log entry
-func (fsm *InMemKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
+// GetKey gets a value for the key.  It reads it directly from the stored log entry
+func (fsm *InMemKeyValueFSM) GetKey(key []byte) (*hexatype.KeyValuePair, error) {
 	fsm.mu.RLock()
 	defer fsm.mu.RUnlock()
 
@@ -118,8 +118,8 @@ func (fsm *DummyFSM) Open() error {
 	return nil
 }
 
-// Get is a noop to satisfy the KeyValueFSM interface
-func (fsm *DummyFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
+// GetKey is a noop to satisfy the KeyValueFSM interface
+func (fsm *DummyFSM) GetKey(key []byte) (*hexatype.KeyValuePair, error) {
 	return nil, fmt.Errorf("dummy fsm")
 }
 
@@ -155,7 +155,7 @@ func (fsm *BadgerKeyValueFSM) Open() (err error) {
 }
 
 // Get gets a value for the key.  It reads it directly from the stored log entry
-func (fsm *BadgerKeyValueFSM) Get(key []byte) (*hexatype.KeyValuePair, error) {
+func (fsm *BadgerKeyValueFSM) GetKey(key []byte) (*hexatype.KeyValuePair, error) {
 	var item badger.KVItem
 	err := fsm.kv.Get(key, &item)
 	if err != nil {

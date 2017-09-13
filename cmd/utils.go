@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"fmt"
@@ -8,23 +8,50 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hexablock/blox"
+	"github.com/hexablock/blox/device"
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
+	"github.com/hexablock/hexatype"
 )
+
+func setupBlockDeviceTransport(ln net.Listener, localDev *device.BlockDevice, hasher hexatype.Hasher) *blox.LocalTransport {
+	opts := blox.DefaultNetClientOptions(hasher)
+	remote := blox.NewNetTransport(ln, opts)
+	trans := blox.NewLocalTransport(ln.Addr().String(), remote)
+	trans.Register(localDev)
+
+	log.Printf("[INFO] BlockDevice transport initialized bind-address=%s", ln.Addr().String())
+	return trans
+}
+
+func setupBlockDevice(basedir string, hasher hexatype.Hasher) (*device.BlockDevice, error) {
+	dir := filepath.Join(basedir, "blox", "blocks")
+	os.MkdirAll(dir, 0755)
+	rdev, err := device.NewFileRawDevice(dir, hasher)
+	if err != nil {
+		return nil, err
+	}
+	dev := device.NewBlockDevice(rdev)
+	log.Println("[INFO] BlockDevice initialized")
+	return dev, nil
+}
 
 func setupStores(baseDir string) (index store.IndexStore, entries store.EntryStore,
 	stable hexalog.StableStore, fsm fidias.KeyValueFSM, err error) {
 
-	if baseDir == "" {
-		log.Printf("[INFO] Using ephemeral storage: in-memory")
-		index = store.NewInMemIndexStore()
-		entries = store.NewInMemEntryStore()
-		stable = &store.InMemStableStore{}
-		fsm = fidias.NewInMemKeyValueFSM()
-		return
-	}
+	// Temporarily disable persistence for hexalog only.
+	//if baseDir == "" {
+	log.Printf("[INFO] Using ephemeral storage: in-memory")
+	index = store.NewInMemIndexStore()
+	entries = store.NewInMemEntryStore()
+	stable = &store.InMemStableStore{}
+	fsm = fidias.NewInMemKeyValueFSM()
+	return
+	//}
 
+	os.MkdirAll(baseDir, 0755)
 	log.Printf("[INFO] Using persistent storage: badger")
 	idir := filepath.Join(baseDir, "index")
 	edir := filepath.Join(baseDir, "entry")

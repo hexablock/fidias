@@ -100,7 +100,7 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 	w.Write(b)
 }
 
-func checkHostNotInSetErrorOrRedirect(e error, locs hexaring.LocationSet, reqPath string) (code int, headers map[string]string, data interface{}, err error) {
+func buildRedirect(locs hexaring.LocationSet, reqPath string) (code int, headers map[string]string, data interface{}, err error) {
 	headers = make(map[string]string)
 
 	// simply return out error

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hexablock/blox/filesystem"
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
@@ -14,26 +15,33 @@ type HTTPServer struct {
 	prefix string     // api version prefix
 	routes httpRoutes // Registerd routes
 
-	conf     *fidias.Config
-	ring     *hexaring.Ring
-	fids     *fidias.Fidias
-	fsm      fidias.KeyValueFSM
+	conf *fidias.Config
+	ring *hexaring.Ring
+	fids *fidias.Fidias
+
 	logstore *hexalog.LogStore
+
+	keyvs *fidias.Keyvs
+
+	dev filesystem.BlockDevice
+	fs  *filesystem.BloxFS
 }
 
 // NewHTTPServer instantiates a new Guac HTTP API server
-func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, fsm fidias.KeyValueFSM, logstore *hexalog.LogStore, fids *fidias.Fidias) *HTTPServer {
+func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, keyvs *fidias.Keyvs, logstore *hexalog.LogStore, dev filesystem.BlockDevice, fids *fidias.Fidias) *HTTPServer {
 	s := &HTTPServer{
 		prefix:   apiPrefix,
 		conf:     conf,
 		ring:     ring,
-		fsm:      fsm,
 		logstore: logstore,
 		fids:     fids,
+		keyvs:    keyvs,
+		dev:      dev,
+		fs:       filesystem.NewBloxFS(dev),
 	}
 	// URL path to handler map
 	s.routes = httpRoutes{
-		"leader":  s.handleLeader,
+		//"leader":  s.handleLeader,
 		"locate":  s.handleLocate,   // Replicated lookups
 		"lookup":  s.handleLookup,   // Chord lookups
 		"hexalog": s.handleHexalog,  // Hexalog interations
@@ -47,8 +55,14 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, f
 func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := strings.TrimPrefix(r.URL.Path, server.prefix)
 	reqpath = strings.TrimPrefix(reqpath, "/")
-	handler, resourceID := server.routes.handler(reqpath)
 
+	// FS handler
+	if strings.HasPrefix(reqpath, "fs") {
+		server.handlerFS(w, r, strings.TrimPrefix(reqpath, "fs/"))
+		return
+	}
+
+	handler, resourceID := server.routes.handler(reqpath)
 	if handler == nil {
 		w.WriteHeader(404)
 		return

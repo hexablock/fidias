@@ -12,6 +12,11 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
+// KeyValueStore implements a key value store interface
+type KeyValueStore interface {
+	GetKey(key []byte) (*hexatype.KeyValuePair, error)
+}
+
 // RelocateStream is a stream to handle relocating of keys between nodes.
 type RelocateStream struct {
 	FidiasRPC_RelocateRPCClient             // grp stream client
@@ -31,7 +36,8 @@ type NetTransport struct {
 
 	replicas int
 	hasher   hexatype.Hasher
-	fetCh    chan<- *relocateReq
+	// Incoming relocation requests. i.e. keys this node needs to take over.
+	fetCh chan<- *relocateReq
 
 	pool     *outPool
 	shutdown int32
@@ -71,10 +77,10 @@ func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) 
 
 // GetKeyRPC serves a GetKey request
 func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *hexatype.KeyValuePair) (*hexatype.KeyValuePair, error) {
-	return trans.kvs.Get(in.Key)
+	return trans.kvs.GetKey(in.Key)
 }
 
-// GetRelocateStream gets a stream to send rebalance data across
+// GetRelocateStream gets a stream to send relocation keys
 func (trans *NetTransport) GetRelocateStream(local, remote *chord.Vnode) (*RelocateStream, error) {
 	conn, err := trans.pool.getConn(remote.Host)
 	if err != nil {
@@ -95,7 +101,8 @@ func (trans *NetTransport) GetRelocateStream(local, remote *chord.Vnode) (*Reloc
 	return &RelocateStream{o: conn, FidiasRPC_RelocateRPCClient: stream, pool: trans.pool}, nil
 }
 
-// RelocateRPC serves a rebalance request for the ring
+// RelocateRPC serves a GetRelocateStream request stream.  It initiates the process to
+// start taking over the sent keys.
 func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error {
 
 	var preamble chord.VnodePair

@@ -7,6 +7,7 @@ import (
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
+	"github.com/hexablock/hexatype"
 )
 
 // RelocatorTransport implements a transport needed by the key rebalancing engine
@@ -23,20 +24,27 @@ type relocateReq struct {
 // Relocator is responsible for moving data as needed when the underlying cluster topology
 // changes
 type Relocator struct {
-	conf  *Config
-	idx   store.IndexStore
-	trans RelocatorTransport
+	//conf  *Config
+	// This is needed to compute relocation
+	replicas int64
+	hasher   hexatype.Hasher
+	idx      store.IndexStore
+	trans    RelocatorTransport
 }
 
 // NewRelocator instantiates a new Relocator
-func NewRelocator(conf *Config, idx store.IndexStore, trans RelocatorTransport) *Relocator {
+func NewRelocator(idx store.IndexStore, replicas int64, hasher hexatype.Hasher) *Relocator {
 
 	return &Relocator{
-		conf:  conf,
-		idx:   idx,
-		trans: trans,
+		replicas: replicas,
+		hasher:   hasher,
+		idx:      idx,
 	}
 
+}
+
+func (reb *Relocator) RegisterTransport(trans RelocatorTransport) {
+	reb.trans = trans
 }
 
 // relocate sends the keys to the new predecessor it needs to takeover.  It returns the
@@ -47,9 +55,10 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 	// predecessor
 	start := time.Now()
 	out := make([]*KeyLocation, 0)
+	// This obtains a read lock.
 	reb.idx.Iter(func(key []byte, idx store.KeylogIndex) error {
 		// get replica hashes for a key including natural hash
-		hashes := hexaring.BuildReplicaHashes(key, int64(reb.conf.Hexalog.Votes), reb.conf.Hasher().New())
+		hashes := hexaring.BuildReplicaHashes(key, reb.replicas, reb.hasher.New())
 		// Get location id for key based on local vnode
 		rid := getVnodeLocID(local.Id, hashes)
 

@@ -11,15 +11,28 @@ import (
 	"github.com/hexablock/log"
 )
 
-type fetcher struct {
-	conf *Config
-	ring *hexaring.Ring
-	hlog *hexalog.Hexalog
+type Healer interface {
+	Heal(key []byte, opts *hexatype.RequestOptions) error
+}
+
+type FetcherTransport interface {
+	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.FutureEntry, error)
+}
+
+type Fetcher struct {
+	locator *hexaring.Ring
+
+	// Used specifically to submit heal request
+	heal Healer
 
 	idx     store.IndexStore
 	entries store.EntryStore
+	// Hexalog network transport
+	//trans hexalog.Transport
 
-	trans *localTransport
+	trans FetcherTransport
+
+	replicas int
 
 	fetCh chan *relocateReq // channel of keys to fetch
 	chkCh chan []byte       // check channel for after a key has been fetched
@@ -27,27 +40,35 @@ type fetcher struct {
 	stopped chan struct{}
 }
 
-func newFetcher(conf *Config, idx store.IndexStore, ent store.EntryStore, hlog *hexalog.Hexalog, trans *localTransport) *fetcher {
-	return &fetcher{
-		conf:    conf,
-		hlog:    hlog,
-		idx:     idx,
-		entries: ent,
-		trans:   trans,
-		fetCh:   make(chan *relocateReq, conf.RelocateBufSize),
-		chkCh:   make(chan []byte, conf.RelocateBufSize),
-		stopped: make(chan struct{}, 2),
+func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize int) *Fetcher {
+	return &Fetcher{
+		idx:      idx,
+		entries:  ent,
+		replicas: replicas,
+		fetCh:    make(chan *relocateReq, bufSize),
+		chkCh:    make(chan []byte, bufSize),
+		stopped:  make(chan struct{}, 2),
 	}
 }
 
-func (fet *fetcher) register(ring *hexaring.Ring) {
-	fet.ring = ring
+// RegisterLocator registers the locator to the fetcher and starts the fetch loop.  This
+// must be called after the transport and healer interfaces have been registered.
+func (fet *Fetcher) RegisterLocator(locator *hexaring.Ring) {
+	fet.locator = locator
 	fet.start()
+}
+
+func (fet *Fetcher) RegisterTransport(trans FetcherTransport) {
+	fet.trans = trans
+}
+
+func (fet *Fetcher) RegisterHealer(healer Healer) {
+	fet.heal = healer
 }
 
 // fetch fetches a keylog from the given vnode.  If the last entry and marker match then
 // fetching is not performed.
-func (fet *fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureEntry, error) {
+func (fet *Fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureEntry, error) {
 	keyidx, err := fet.idx.GetKey(key)
 	if err != nil {
 		return nil, err
@@ -70,10 +91,10 @@ func (fet *fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureE
 		last = &hexatype.Entry{Key: key}
 	}
 
-	return fet.trans.remote.FetchKeylog(vn.Host, last, nil)
+	return fet.trans.FetchKeylog(vn.Host, last, nil)
 }
 
-func (fet *fetcher) fetchKeys() {
+func (fet *Fetcher) fetchKeys() {
 	for req := range fet.fetCh {
 		// self is the remote node that has the data.  Key entries will be fetched from this
 		// vnode
@@ -97,16 +118,16 @@ func (fet *fetcher) fetchKeys() {
 	fet.stopped <- struct{}{}
 }
 
-func (fet *fetcher) checkKeys() {
+func (fet *Fetcher) checkKeys() {
 	for key := range fet.chkCh {
 
-		locs, err := fet.ring.LookupReplicated(key, fet.conf.Hexalog.Votes)
+		locs, err := fet.locator.LookupReplicated(key, fet.replicas)
 		if err != nil {
 			log.Printf("[ERROR] Key check failed key=%s error='%v'", key, err)
 			continue
 		}
 
-		if err = fet.hlog.Heal(key, &hexatype.RequestOptions{PeerSet: locs}); err != nil {
+		if err = fet.heal.Heal(key, &hexatype.RequestOptions{PeerSet: locs}); err != nil {
 			log.Printf("[ERROR] Heal failed key=%s error='%v'", key, err)
 		}
 
@@ -117,13 +138,13 @@ func (fet *fetcher) checkKeys() {
 
 // start listens to the fetch channel handling each request. It fetches the log for a key
 // from the remot in the requets.  This is a blocking call
-func (fet *fetcher) start() {
+func (fet *Fetcher) start() {
 	go fet.checkKeys()
 	go fet.fetchKeys()
 }
 
 // blocking call
-func (fet *fetcher) stop() {
+func (fet *Fetcher) stop() {
 	close(fet.fetCh)
 	<-fet.stopped // fetch
 	<-fet.stopped // check

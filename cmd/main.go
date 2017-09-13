@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
@@ -62,30 +62,68 @@ func main() {
 	conf := configure()
 	printStartBanner(conf)
 
-	// Server
+	// Blox net
+	bloxLn, err := net.Listen("tcp", *bloxAddr)
+	if err != nil {
+		log.Fatalf("[ERROR] Failed start listening on %s: %v", *bloxAddr, err)
+	}
+
+	// GRPC Server
 	ln, err := net.Listen("tcp", *bindAddr)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed start listening on %s: %v", *bindAddr, err)
 	}
+
 	gserver := grpc.NewServer()
 
-	// Stores
-	os.MkdirAll(*dataDir, 0755)
+	timeout := 3 * time.Second
+	maxIdle := 3 * time.Minute
+	reapInt := 30 * time.Second
+
+	// Init hexaring
+	peers := hexaring.NewInMemPeerStore()
+	ring := hexaring.New(conf.Ring, peers, timeout, maxIdle)
+	ring.RegisterServer(gserver)
+
+	// Init log store with fsm
 	index, entries, stable, fsm, err := setupStores(*dataDir)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to load stored: %v", err)
 	}
-	logStore := hexalog.NewLogStore(entries, index, conf.Hexalog.Hasher)
+	logstore := hexalog.NewLogStore(entries, index, conf.Hexalog.Hasher)
 
-	// Init hexaring
-	peers := hexaring.NewInMemPeerStore()
-	ring := hexaring.New(conf.Ring, peers, gserver)
+	lognet := hexalog.NewNetTransport(reapInt, maxIdle)
+	hexalog.RegisterHexalogRPCServer(gserver, lognet)
+
+	hexlog, err := fidias.NewHexalog(conf.Hexalog, logstore, stable, fsm, lognet)
+	if err != nil {
+		log.Fatalf("[ERROR] Failed to initialize hexalog: %v", err)
+	}
+
+	log.Println("[INFO] Hexalog initialized")
+
+	// Fetcher
+	fet := fidias.NewFetcher(index, entries, conf.Hexalog.Votes, conf.RelocateBufSize)
+	// Relocator
+	rel := fidias.NewRelocator(index, int64(conf.Hexalog.Votes), conf.Hasher())
+	// Key-value
+	keyvs := fidias.NewKeyvs(hexlog, fsm)
+	log.Println("[INFO] Keyvs initialized")
+
+	// Blox
+	bdev, err := setupBlockDevice(*dataDir, conf.Hasher())
+	if err != nil {
+		log.Fatalf("[ERROR] Failed to setup block device: %v", err)
+	}
+	bloxTrans := setupBlockDeviceTransport(bloxLn, bdev, conf.Hasher())
+	dev := fidias.NewRingDevice(1, conf.Hasher(), bloxTrans)
+	log.Println("[INFO] RingDevice initialized")
 
 	// Fidias
-	fids, err := fidias.New(conf, fsm, index, entries, logStore, stable, gserver)
-	if err != nil {
-		log.Fatal("[ERROR] Failed to initialize fidias:", err)
-	}
+	fidTrans := fidias.NewNetTransport(fsm, index, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hasher())
+	fidias.RegisterFidiasRPCServer(gserver, fidTrans)
+
+	fids := fidias.New(conf, hexlog, rel, fet, keyvs, dev, fidTrans)
 
 	// Start serving network requests.  This needs to be started before trying to create or
 	// join the ring as the ring initialization requires the transport
@@ -102,7 +140,7 @@ func main() {
 
 	// Start HTTP API
 	log.Printf("[INFO] Starting HTTP server bind-address=%s", *httpAddr)
-	httpServer := gateways.NewHTTPServer("/v1", conf, ring, fsm, logStore, fids)
+	httpServer := gateways.NewHTTPServer("/v1", conf, ring, keyvs, logstore, dev, fids)
 	if err = http.ListenAndServe(*httpAddr, httpServer); err != nil {
 		log.Fatal("[ERROR]", err)
 	}

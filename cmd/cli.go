@@ -21,6 +21,9 @@ var (
 	// Address used by http server for redirects.  This is what is published in the meta for a vnode
 	httpAdvAddr = flag.String("http-adv-addr", os.Getenv("FIDS_HTTP_ADV_ADDR"), "HTTP address to adversise [env FIDS_HTTP_ADV_ADDR]")
 
+	bloxAddr    = flag.String("blox-addr", "127.0.0.1:42100", "Blox bind address")
+	bloxAdvAddr = flag.String("blox-adv-addr", os.Getenv("FIDS_BLOX_ADV_ADDR"), "Blox bind address [env FIDS_BLOX_ADV_ADDR]")
+
 	joinAddr      = flag.String("join", "", "Comma delimted list of existing peers to join")
 	retryJoinAddr = flag.String("retry-join", "", "Comma delimted list of existing peers to retry joining")
 
@@ -47,6 +50,14 @@ func checkAddrs() {
 		os.Exit(1)
 	}
 	*httpAdvAddr = hAdv
+
+	// Blox advertise
+	bAdv, err := buildAdvertiseAddr(*bloxAdvAddr, *bloxAddr)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	*bloxAdvAddr = bAdv
 }
 
 func configure() *fidias.Config {
@@ -54,6 +65,7 @@ func configure() *fidias.Config {
 	conf := fidias.DefaultConfig(*advAddr)
 	// advertise address for http
 	conf.Ring.Meta["http"] = []byte(*httpAdvAddr)
+	conf.Ring.Meta["blox"] = []byte(*bloxAdvAddr)
 
 	if *debug {
 		// Setup the standard built-in log for underlying libraries
@@ -89,10 +101,11 @@ func printStartBanner(conf *fidias.Config) {
 
   Advertise : %s
   Cluster   : %s
+  Blox      : %s
   HTTP      : %s
 
   Hasher    : %s
   Vnodes    : %d
 
-`, version, *advAddr, *bindAddr, *httpAddr, conf.Hexalog.Hasher.Algorithm(), conf.Ring.NumVnodes)
+`, version, *advAddr, *bindAddr, *bloxAddr, *httpAddr, conf.Hexalog.Hasher.Algorithm(), conf.Ring.NumVnodes)
 }
