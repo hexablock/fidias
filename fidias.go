@@ -101,8 +101,8 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 	fids.rel.RegisterTransport(trans)
 	// Register keyvs transport
 	fids.keyvs.RegisterTransport(trans)
-	// Register fetch channel to fidias network transport
-	trans.Register(fetcher.fetCh)
+	// Register fetch channels to fidias network transport
+	trans.Register(fetcher.fetCh, fetcher.blkCh)
 
 	// Init hexalog transport and register with gRPC
 	//logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)

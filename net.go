@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
@@ -17,46 +18,61 @@ type KeyValueStore interface {
 	GetKey(key []byte) (*hexatype.KeyValuePair, error)
 }
 
-// RelocateStream is a stream to handle relocating of keys between nodes.
-type RelocateStream struct {
-	FidiasRPC_RelocateRPCClient             // grp stream client
-	o                           *rpcOutConn // connection to return
-	pool                        *outPool    // pool to return connection to
+type streamBase struct {
+	o    *rpcOutConn // connection to return
+	pool *outPool    // pool to return connection to
 }
 
 // Recycle recycles the stream returning the conn back to the pool
-func (rs *RelocateStream) Recycle() {
+func (rs *streamBase) Recycle() {
 	rs.pool.returnConn(rs.o)
+}
+
+// RelocateStream is a stream to handle relocating of keys between nodes.
+type RelocateStream struct {
+	*streamBase
+	FidiasRPC_RelocateRPCClient // grp stream client
+
+}
+
+type RelocateBlocksStream struct {
+	*streamBase
+	FidiasRPC_RelocateBlocksRPCClient // grp stream client
 }
 
 // NetTransport implements a network transport needed for fidias
 type NetTransport struct {
-	kvs  KeyValueStore
-	idxs store.IndexStore
+	kvs     KeyValueStore
+	idxs    store.IndexStore
+	journal device.Journal
 
 	replicas int
 	hasher   hexatype.Hasher
 	// Incoming relocation requests. i.e. keys this node needs to take over.
 	fetCh chan<- *relocateReq
+	// Incoming block relocation requests
+	fetBlks chan<- *relocateReq
 
 	pool     *outPool
 	shutdown int32
 }
 
 // NewNetTransport instantiates a new network transport using the given key-value store.
-func NewNetTransport(kvs KeyValueStore, idx store.IndexStore, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
+func NewNetTransport(kvs KeyValueStore, idx store.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
 	return &NetTransport{
 		kvs:      kvs,
 		idxs:     idx,
+		journal:  journal,
 		replicas: replicas,
 		hasher:   hasher,
 		pool:     newOutPool(maxIdle, reapInterval),
 	}
 }
 
-// Register registers a write channel used for submitting reloc. requests
-func (trans *NetTransport) Register(ch chan<- *relocateReq) {
-	trans.fetCh = ch
+// Register registers a write channel used for submitting reloc. requests for keylogs and blocks.
+func (trans *NetTransport) Register(fetLogCh, fetBlkCh chan<- *relocateReq) {
+	trans.fetCh = fetLogCh
+	trans.fetBlks = fetBlkCh
 }
 
 // GetKey retrieves a key from a remote host
@@ -98,7 +114,10 @@ func (trans *NetTransport) GetRelocateStream(local, remote *chord.Vnode) (*Reloc
 		return nil, hexatype.ParseGRPCError(err)
 	}
 
-	return &RelocateStream{o: conn, FidiasRPC_RelocateRPCClient: stream, pool: trans.pool}, nil
+	return &RelocateStream{
+		streamBase:                  &streamBase{o: conn, pool: trans.pool},
+		FidiasRPC_RelocateRPCClient: stream,
+	}, nil
 }
 
 // RelocateRPC serves a GetRelocateStream request stream.  It initiates the process to
@@ -121,7 +140,7 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 		}
 
 		// Create key if it does not exist
-		ki, err := trans.idxs.UpsertKey(keyLoc.Key, keyLoc.Marker)
+		ki, err := trans.idxs.MarkKey(keyLoc.Key, keyLoc.Marker)
 		if err != nil {
 			log.Printf("[ERROR] Failed to upsert key=%s error='%v'", keyLoc.Key, err)
 			continue
@@ -132,6 +151,55 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 		if ki.Marker() != nil {
 			trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
 		}
+	} // end loop
+
+}
+
+// GetRelocateBlocksStream gets a stream to send relocation keys
+func (trans *NetTransport) GetRelocateBlocksStream(local, remote *chord.Vnode) (*RelocateBlocksStream, error) {
+	conn, err := trans.pool.getConn(remote.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := conn.client.RelocateBlocksRPC(context.Background())
+	if err != nil {
+		return nil, hexatype.ParseGRPCError(err)
+	}
+
+	preamble := &chord.VnodePair{Self: local, Target: remote}
+	if err = stream.SendMsg(preamble); err != nil {
+		trans.pool.returnConn(conn)
+		return nil, hexatype.ParseGRPCError(err)
+	}
+
+	return &RelocateBlocksStream{
+		streamBase:                        &streamBase{o: conn, pool: trans.pool},
+		FidiasRPC_RelocateBlocksRPCClient: stream,
+	}, nil
+}
+
+// RelocateBlocksRPC serves a GetRelocateStream request stream.  It initiates the process to
+// start taking over the sent keys.
+func (trans *NetTransport) RelocateBlocksRPC(stream FidiasRPC_RelocateBlocksRPCServer) error {
+
+	var preamble chord.VnodePair
+	if err := stream.RecvMsg(&preamble); err != nil {
+		return err
+	}
+
+	for {
+		keyLoc, err := stream.Recv()
+		//	Exit loop on error
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		trans.fetBlks <- &relocateReq{keyloc: keyLoc, mems: &preamble}
+
 	} // end loop
 
 }

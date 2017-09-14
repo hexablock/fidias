@@ -13,7 +13,7 @@
 
 1. Download a pre-compiled binary from the [releases page]((https://github.com/hexablock/fidias/releases)).
 
-2. Extract the binary using `unzip` or `tar`.
+2. Extract the binary using `unzip` or `tar` depending on the one downloaded.
 
 3. Move the binary into your `$PATH`.
 

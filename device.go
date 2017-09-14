@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"errors"
+	"log"
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
@@ -68,6 +69,7 @@ func (dev *RingDevice) SetBlock(blk block.Block) ([]byte, error) {
 
 		i, er := dev.trans.SetBlock(string(host), blk)
 		if er != nil {
+			//log.Println("[ERROR] RingDevice.SetBlock", er)
 			err = er
 		} else {
 			id = i
@@ -77,7 +79,7 @@ func (dev *RingDevice) SetBlock(blk block.Block) ([]byte, error) {
 		//break
 	}
 
-	//log.Printf("RingDevice.SetBlock id=%x error='%v'", id, err)
+	log.Printf("[DEBUG] RingDevice.SetBlock id=%x type=%s error='%v'", id, blk.Type(), err)
 
 	return id, err
 }

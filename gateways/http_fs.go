@@ -42,12 +42,12 @@ func (server *HTTPServer) handlerFS(w http.ResponseWriter, r *http.Request, reso
 
 		_, err = io.Copy(fh, r.Body)
 		defer r.Body.Close()
-		fh.Close()
 		if err != nil {
 			writeJSONResponse(w, 400, map[string]string{}, nil, err)
 		} else {
+			err = fh.Close()
 			data := fh.Sys()
-			writeJSONResponse(w, 200, map[string]string{}, data, nil)
+			writeJSONResponse(w, 200, map[string]string{}, data, err)
 		}
 
 	default:

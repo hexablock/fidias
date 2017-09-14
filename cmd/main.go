@@ -102,25 +102,32 @@ func main() {
 
 	log.Println("[INFO] Hexalog initialized")
 
-	// Fetcher
-	fet := fidias.NewFetcher(index, entries, conf.Hexalog.Votes, conf.RelocateBufSize)
-	// Relocator
-	rel := fidias.NewRelocator(index, int64(conf.Hexalog.Votes), conf.Hasher())
 	// Key-value
 	keyvs := fidias.NewKeyvs(hexlog, fsm)
 	log.Println("[INFO] Keyvs initialized")
 
 	// Blox
-	bdev, err := setupBlockDevice(*dataDir, conf.Hasher())
+	journal, bdev, err := setupBlockDevice(*dataDir, conf.Hasher())
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to setup block device: %v", err)
 	}
+
+	// Fetcher
+	fet := fidias.NewFetcher(index, entries, conf.Hexalog.Votes, conf.RelocateBufSize)
+	fet.RegisterBlockDevice(bdev)
+	// Relocator
+	rel := fidias.NewRelocator(int64(conf.Hexalog.Votes), conf.Hasher())
+	rel.RegisterKeylogIndex(index)
+	rel.RegisterBlockJournal(journal)
+
 	bloxTrans := setupBlockDeviceTransport(bloxLn, bdev, conf.Hasher())
-	dev := fidias.NewRingDevice(1, conf.Hasher(), bloxTrans)
-	log.Println("[INFO] RingDevice initialized")
+
+	blockReplicas := 2
+	dev := fidias.NewRingDevice(blockReplicas, conf.Hasher(), bloxTrans)
+	log.Println("[INFO] RingDevice replicas=%d", blockReplicas)
 
 	// Fidias
-	fidTrans := fidias.NewNetTransport(fsm, index, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hasher())
+	fidTrans := fidias.NewNetTransport(fsm, index, journal, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hasher())
 	fidias.RegisterFidiasRPCServer(gserver, fidTrans)
 
 	fids := fidias.New(conf, hexlog, rel, fet, keyvs, dev, fidTrans)

@@ -25,6 +25,8 @@ type testServer struct {
 
 	bln    net.Listener
 	btrans *blox.LocalTransport
+	j      device.Journal
+	bdev   *device.BlockDevice
 
 	ln   net.Listener
 	g    *grpc.Server
@@ -46,14 +48,15 @@ func (ts *testServer) setupBlox() {
 	ts.dir, _ = ioutil.TempDir("", "fidias")
 
 	rdev, _ := device.NewFileRawDevice(ts.dir, ts.hasher)
-	dev := device.NewBlockDevice(rdev)
+	dev := device.NewBlockDevice(ts.j, rdev)
 
 	opts := blox.DefaultNetClientOptions(ts.hasher)
 	remote := blox.NewNetTransport(ts.bln, opts)
 	trans := blox.NewLocalTransport(ts.bln.Addr().String(), remote)
 	trans.Register(dev)
-	ts.btrans = trans
 
+	ts.btrans = trans
+	ts.bdev = dev
 }
 
 func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) {
@@ -68,12 +71,15 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	}
 
 	ts := &testServer{
+		j:   device.NewInmemJournal(),
 		bln: bln,
 		ln:  ln,
 		g:   grpc.NewServer(),
 		c:   DefaultConfig(addr),
 		ps:  hexaring.NewInMemPeerStore(),
 	}
+	ts.hasher = ts.c.Hexalog.Hasher
+	ts.setupBlox()
 
 	// Ring
 	ts.c.Ring.StabilizeMin = time.Duration(15 * time.Millisecond)
@@ -106,13 +112,16 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 
 	// Fetcher
 	fet := NewFetcher(idx, es, ts.c.Hexalog.Votes, ts.c.RelocateBufSize)
+	fet.RegisterBlockDevice(ts.bdev)
 	// Relocator
-	rel := NewRelocator(idx, int64(ts.c.Hexalog.Votes), ts.c.Hasher())
+	rel := NewRelocator(int64(ts.c.Hexalog.Votes), ts.c.Hasher())
+	rel.RegisterBlockJournal(ts.j)
+	rel.RegisterKeylogIndex(idx)
 	// Key-value
 	keyvs := NewKeyvs(hexlog, fsm)
 
 	// Fidias
-	fidTrans := NewNetTransport(fsm, idx, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
+	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
 	RegisterFidiasRPCServer(ts.g, fidTrans)
 
 	ts.fids = New(ts.c, hexlog, rel, fet, keyvs, nil, fidTrans)

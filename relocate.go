@@ -2,8 +2,10 @@ package fidias
 
 import (
 	"bytes"
+	"log"
 	"time"
 
+	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
@@ -13,6 +15,7 @@ import (
 // RelocatorTransport implements a transport needed by the key rebalancing engine
 type RelocatorTransport interface {
 	GetRelocateStream(local, remote *chord.Vnode) (*RelocateStream, error)
+	GetRelocateBlocksStream(local, remote *chord.Vnode) (*RelocateBlocksStream, error)
 }
 
 // rebReq contains data for perform a relocation
@@ -24,32 +27,61 @@ type relocateReq struct {
 // Relocator is responsible for moving data as needed when the underlying cluster topology
 // changes
 type Relocator struct {
-	//conf  *Config
 	// This is needed to compute relocation
 	replicas int64
 	hasher   hexatype.Hasher
-	idx      store.IndexStore
-	trans    RelocatorTransport
+	// Keylog index
+	idx store.IndexStore
+	// Block index
+	blkj device.Journal
+	// RPC transport
+	trans RelocatorTransport
 }
 
 // NewRelocator instantiates a new Relocator
-func NewRelocator(idx store.IndexStore, replicas int64, hasher hexatype.Hasher) *Relocator {
+func NewRelocator(replicas int64, hasher hexatype.Hasher) *Relocator {
 
 	return &Relocator{
 		replicas: replicas,
 		hasher:   hasher,
-		idx:      idx,
 	}
 
 }
 
+// RegisterTransport registers the transport to be used for relocation
 func (reb *Relocator) RegisterTransport(trans RelocatorTransport) {
 	reb.trans = trans
 }
 
-// relocate sends the keys to the new predecessor it needs to takeover.  It returns the
-// number of keys relocated and/or an error
+// RegisterBlockJournal registers a block journal to the relocator to be used to determine
+// which blocks need to be relocated.
+func (reb *Relocator) RegisterBlockJournal(journal device.Journal) {
+	reb.blkj = journal
+}
+
+// RegisterKeylogIndex register an index store of keylogs  to the relocator to be used to
+// determine the keys that need to be relocated
+func (reb *Relocator) RegisterKeylogIndex(idx store.IndexStore) {
+	reb.idx = idx
+}
+
 func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Duration, err error) {
+	n, rt, err = reb.relocateKeylogs(local, newPred)
+
+	// Do this in a go-routine after keylocg relocation as it's not as critical to get the
+	// block id's across
+	//
+	go func() {
+		n, rt, err := reb.relocateBlocks(local, newPred)
+		log.Printf("[INFO] Block relocation count=%d runtime=%v error='%v'", n, rt, err)
+	}()
+	//
+	return n, rt, err
+}
+
+// relocateKeylogs sends the keys to the new predecessor it needs to takeover.  It returns the
+// number of keys relocated and/or an error
+func (reb *Relocator) relocateKeylogs(local, newPred *chord.Vnode) (n int, rt time.Duration, err error) {
 	// Collect keys that need relocating by first calculating the replica id for the key
 	// and new pred vnode, then selecting keys who's replica id's are <= to the new
 	// predecessor
@@ -91,6 +123,64 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 
 	// Get relocate stream to remote
 	stream, err := reb.trans.GetRelocateStream(local, newPred)
+	if err != nil {
+		rt = time.Since(start)
+		return 0, rt, err
+	}
+	// Set stream to be re-used.
+	defer stream.Recycle()
+	// Send selected keys
+	for _, kl := range out {
+		n++
+		if err = stream.Send(kl); err != nil {
+			stream.CloseSend()
+			rt = time.Since(start)
+			return
+		}
+	}
+
+	err = stream.CloseSend()
+	rt = time.Since(start)
+	return
+}
+
+// relocateBlocks sends the block ids to the new predecessor it needs to takeover.  It
+// returns the number of blocks relocated and/or an error
+func (reb *Relocator) relocateBlocks(local, newPred *chord.Vnode) (n int, rt time.Duration, err error) {
+	// Collect keys that need relocating by first calculating the replica id for the key
+	// and new pred vnode, then selecting keys who's replica id's are <= to the new
+	// predecessor
+	start := time.Now()
+	out := make([]*KeyLocation, 0)
+	// This obtains a read lock.
+	reb.blkj.Iter(func(key, val []byte) error {
+		// Get replica hashes for a key including natural hash
+		hashes := hexaring.BuildReplicaHashes(key, reb.replicas, reb.hasher.New())
+		// Get location id for key based on local vnode
+		rid := getVnodeLocID(local.Id, hashes)
+		// Check if replica id is less than our new predecessor and add to list.
+		if bytes.Compare(rid, newPred.Id) <= 0 {
+
+			kloc := &KeyLocation{
+				Key:    key,
+				Marker: val,
+			}
+
+			out = append(out, kloc)
+		}
+
+		// Move onto to the next
+		return nil
+	})
+
+	// No keys to relocate
+	if len(out) == 0 {
+		rt = time.Since(start)
+		return
+	}
+
+	// Get relocate stream to remote
+	stream, err := reb.trans.GetRelocateBlocksStream(local, newPred)
 	if err != nil {
 		rt = time.Since(start)
 		return 0, rt, err

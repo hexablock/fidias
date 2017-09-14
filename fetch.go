@@ -3,6 +3,8 @@ package fidias
 import (
 	"bytes"
 
+	"github.com/hexablock/blox/block"
+	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
@@ -21,21 +23,21 @@ type FetcherTransport interface {
 
 type Fetcher struct {
 	locator *hexaring.Ring
-
 	// Used specifically to submit heal request
 	heal Healer
-
+	// Hexalog stores
 	idx     store.IndexStore
 	entries store.EntryStore
-	// Hexalog network transport
-	//trans hexalog.Transport
+	// Local BlockDevice
+	dev *device.BlockDevice
 
 	trans FetcherTransport
 
 	replicas int
 
-	fetCh chan *relocateReq // channel of keys to fetch
-	chkCh chan []byte       // check channel for after a key has been fetched
+	fetCh chan *relocateReq // channel containing of keys to fetch
+	chkCh chan []byte       // channel to check key after a fetch is complete
+	blkCh chan *relocateReq // channel contianing blocks to fetch
 
 	stopped chan struct{}
 }
@@ -47,7 +49,8 @@ func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize in
 		replicas: replicas,
 		fetCh:    make(chan *relocateReq, bufSize),
 		chkCh:    make(chan []byte, bufSize),
-		stopped:  make(chan struct{}, 2),
+		blkCh:    make(chan *relocateReq, bufSize),
+		stopped:  make(chan struct{}, 3),
 	}
 }
 
@@ -64,6 +67,10 @@ func (fet *Fetcher) RegisterTransport(trans FetcherTransport) {
 
 func (fet *Fetcher) RegisterHealer(healer Healer) {
 	fet.heal = healer
+}
+
+func (fet *Fetcher) RegisterBlockDevice(dev *device.BlockDevice) {
+	fet.dev = dev
 }
 
 // fetch fetches a keylog from the given vnode.  If the last entry and marker match then
@@ -112,7 +119,7 @@ func (fet *Fetcher) fetchKeys() {
 
 	}
 
-	// close the check channel
+	// Close the check channel
 	close(fet.chkCh)
 	// signal we have exited the loop
 	fet.stopped <- struct{}{}
@@ -136,16 +143,40 @@ func (fet *Fetcher) checkKeys() {
 	fet.stopped <- struct{}{}
 }
 
+func (fet *Fetcher) fetchBlocks() {
+	for rr := range fet.blkCh {
+		id := rr.keyloc.Key
+
+		// Marker contains the type and size at the bare minimum
+		m := rr.keyloc.Marker
+		typ := block.BlockType(m[0])
+		log.Printf("[TODO] Relocate block id=%x type=%s", id, typ)
+
+		//size:=binary.BigEndian.Uint64(m[1:9])
+		//fet.dev.SetBlock()
+
+	}
+
+	// signal we have exited the loop
+	fet.stopped <- struct{}{}
+}
+
 // start listens to the fetch channel handling each request. It fetches the log for a key
 // from the remot in the requets.  This is a blocking call
 func (fet *Fetcher) start() {
 	go fet.checkKeys()
 	go fet.fetchKeys()
+	go fet.fetchBlocks()
 }
 
 // blocking call
 func (fet *Fetcher) stop() {
+	// close keylog fetcher which will close the key check channel as well
 	close(fet.fetCh)
-	<-fet.stopped // fetch
-	<-fet.stopped // check
+	// close block fetcher channel
+	close(fet.blkCh)
+	// Wait for all 3 go-routines to complete
+	<-fet.stopped // fetcher
+	<-fet.stopped // key checker
+	<-fet.stopped // block fetcher
 }
