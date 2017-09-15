@@ -19,7 +19,6 @@ func TestRingDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//	ts1.setupBlox()
 	defer ts1.cleanup()
 	<-time.After(100 * time.Millisecond)
 
@@ -27,7 +26,6 @@ func TestRingDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//ts2.setupBlox()
 	defer ts2.cleanup()
 	<-time.After(100 * time.Millisecond)
 
@@ -35,7 +33,6 @@ func TestRingDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//ts3.setupBlox()
 	defer ts3.cleanup()
 	<-time.After(300 * time.Millisecond)
 

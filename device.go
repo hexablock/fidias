@@ -79,7 +79,7 @@ func (dev *RingDevice) SetBlock(blk block.Block) ([]byte, error) {
 		//break
 	}
 
-	log.Printf("[DEBUG] RingDevice.SetBlock id=%x type=%s error='%v'", id, blk.Type(), err)
+	log.Printf("[DEBUG] RingDevice.SetBlock id=%x type=%s error='%v'", blk.ID(), blk.Type(), err)
 
 	return id, err
 }

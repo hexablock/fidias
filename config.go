@@ -3,6 +3,7 @@ package fidias
 import (
 	"time"
 
+	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
@@ -10,7 +11,7 @@ import (
 
 // Config hold the guac config along with the underlying log and ring config
 type Config struct {
-	Ring            *hexaring.Config
+	Ring            *chord.Config
 	Hexalog         *hexalog.Config
 	RelocateBufSize int           // Relocate request buffer size
 	RetryInterval   time.Duration // interval to wait before retrying a proposal

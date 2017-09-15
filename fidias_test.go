@@ -89,7 +89,8 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 		ts.ps.AddPeer(p)
 	}
 
-	ts.r = hexaring.New(ts.c.Ring, ts.ps, 3*time.Second, 10*time.Second)
+	chordTrans := chord.NewGRPCTransport(3*time.Second, 10*time.Second)
+	ts.r = hexaring.New(ts.c.Ring, ts.ps, chordTrans)
 	ts.r.RegisterServer(ts.g)
 
 	// Stores

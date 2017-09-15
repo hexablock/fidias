@@ -14,6 +14,7 @@ import (
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/fidias/gateways"
+	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/log"
@@ -82,7 +83,8 @@ func main() {
 
 	// Init hexaring
 	peers := hexaring.NewInMemPeerStore()
-	ring := hexaring.New(conf.Ring, peers, timeout, maxIdle)
+	chordTrans := chord.NewGRPCTransport(timeout, maxIdle)
+	ring := hexaring.New(conf.Ring, peers, chordTrans)
 	ring.RegisterServer(gserver)
 
 	// Init log store with fsm
@@ -124,7 +126,7 @@ func main() {
 
 	blockReplicas := 2
 	dev := fidias.NewRingDevice(blockReplicas, conf.Hasher(), bloxTrans)
-	log.Println("[INFO] RingDevice replicas=%d", blockReplicas)
+	log.Printf("[INFO] Default RingDevice replicas=%d", blockReplicas)
 
 	// Fidias
 	fidTrans := fidias.NewNetTransport(fsm, index, journal, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hasher())
