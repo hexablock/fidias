@@ -168,16 +168,16 @@ func (fet *Fetcher) fetchBlocks() {
 		remote := string(bb)
 
 		var blk block.Block
-
 		switch typ {
 		case block.BlockTypeData:
-			//log.Printf("Fetching from=%s id=%x", remote, id)
+			// Actually fetch
 			blk, err = fet.blks.GetBlock(remote, id)
 
 		case block.BlockTypeIndex:
 			// Inline block
 			index := block.NewIndexBlock(nil, fet.hasher)
 			if err = index.UnmarshalBinary(m); err == nil {
+				index.Hash()
 				blk = index
 			}
 
@@ -185,6 +185,7 @@ func (fet *Fetcher) fetchBlocks() {
 			// Inline block
 			tree := block.NewTreeBlock(nil, fet.hasher)
 			if err = tree.UnmarshalBinary(m); err == nil {
+				tree.Hash()
 				blk = tree
 			}
 
