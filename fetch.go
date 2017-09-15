@@ -3,8 +3,8 @@ package fidias
 import (
 	"bytes"
 
+	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
-	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
@@ -28,12 +28,14 @@ type Fetcher struct {
 	// Hexalog stores
 	idx     store.IndexStore
 	entries store.EntryStore
-	// Local BlockDevice
-	dev *device.BlockDevice
+
+	// block device transport to handle local and remote
+	blks blox.Transport
 
 	trans FetcherTransport
 
 	replicas int
+	hasher   hexatype.Hasher
 
 	fetCh chan *relocateReq // channel containing of keys to fetch
 	chkCh chan []byte       // channel to check key after a fetch is complete
@@ -42,11 +44,12 @@ type Fetcher struct {
 	stopped chan struct{}
 }
 
-func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize int) *Fetcher {
+func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize int, hasher hexatype.Hasher) *Fetcher {
 	return &Fetcher{
 		idx:      idx,
 		entries:  ent,
 		replicas: replicas,
+		hasher:   hasher,
 		fetCh:    make(chan *relocateReq, bufSize),
 		chkCh:    make(chan []byte, bufSize),
 		blkCh:    make(chan *relocateReq, bufSize),
@@ -69,8 +72,8 @@ func (fet *Fetcher) RegisterHealer(healer Healer) {
 	fet.heal = healer
 }
 
-func (fet *Fetcher) RegisterBlockDevice(dev *device.BlockDevice) {
-	fet.dev = dev
+func (fet *Fetcher) RegisterBlockTransport(blks blox.Transport) {
+	fet.blks = blks
 }
 
 // fetch fetches a keylog from the given vnode.  If the last entry and marker match then
@@ -147,14 +150,59 @@ func (fet *Fetcher) fetchBlocks() {
 	for rr := range fet.blkCh {
 		id := rr.keyloc.Key
 
+		// Get local blox address
+		ll, _ := rr.mems.Target.Metadata()["blox"]
+		local := string(ll)
+		// Skip if we have the block
+		_, err := fet.blks.GetBlock(local, id)
+		if err == nil {
+			continue
+		}
+
 		// Marker contains the type and size at the bare minimum
 		m := rr.keyloc.Marker
 		typ := block.BlockType(m[0])
-		log.Printf("[TODO] Relocate block id=%x type=%s", id, typ)
 
-		//size:=binary.BigEndian.Uint64(m[1:9])
-		//fet.dev.SetBlock()
+		// Remote host to get block from
+		bb, _ := rr.mems.Self.Metadata()["blox"]
+		remote := string(bb)
 
+		var blk block.Block
+
+		switch typ {
+		case block.BlockTypeData:
+			//log.Printf("Fetching from=%s id=%x", remote, id)
+			blk, err = fet.blks.GetBlock(remote, id)
+
+		case block.BlockTypeIndex:
+			// Inline block
+			index := block.NewIndexBlock(nil, fet.hasher)
+			if err = index.UnmarshalBinary(m); err == nil {
+				blk = index
+			}
+
+		case block.BlockTypeTree:
+			// Inline block
+			tree := block.NewTreeBlock(nil, fet.hasher)
+			if err = tree.UnmarshalBinary(m); err == nil {
+				blk = tree
+			}
+
+		default:
+			err = block.ErrInvalidBlockType
+			continue
+
+		}
+
+		if err != nil {
+			log.Printf("[ERROR] Fetcher failed get block id=%x type=%s error='%v'", id, typ, err)
+			continue
+		}
+
+		// Set the block locally
+		if _, err = fet.blks.SetBlock(local, blk); err != nil {
+			log.Printf("[ERROR] Fetcher failed set block id=%x error='%v'", id, err)
+		}
 	}
 
 	// signal we have exited the loop

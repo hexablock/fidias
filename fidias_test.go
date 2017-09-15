@@ -111,8 +111,8 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ts.hasher = ts.c.Hasher()
 
 	// Fetcher
-	fet := NewFetcher(idx, es, ts.c.Hexalog.Votes, ts.c.RelocateBufSize)
-	fet.RegisterBlockDevice(ts.bdev)
+	fet := NewFetcher(idx, es, ts.c.Hexalog.Votes, ts.c.RelocateBufSize, ts.c.Hasher())
+	fet.RegisterBlockTransport(ts.btrans)
 	// Relocator
 	rel := NewRelocator(int64(ts.c.Hexalog.Votes), ts.c.Hasher())
 	rel.RegisterBlockJournal(ts.j)

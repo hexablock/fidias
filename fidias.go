@@ -29,27 +29,16 @@ type ReMeta struct {
 type Fidias struct {
 	// Configuration
 	conf *Config
-	// Underlying chord ring
+	// Underlying ring
 	ring *hexaring.Ring
-
+	// Ring backed hexalog
 	hexlog *Hexalog
-
 	// Key-value interface
 	keyvs *Keyvs
-
-	// Blox device
+	// Ring backed BlockDevice
 	dev *RingDevice
-
-	// Transport to handle local and remote calls
-	//ftrans *localTransport
-	// Overall log manager
-	//hexlog *hexalog.Hexalog
-
-	// FSM
-	//fsm KeyValueFSM
-
-	// Blocks of keys this node is responsible for. These are the local vnodes and their
-	// respective predecessors
+	// Blocks of keys this node is responsible for. These are the local vnodes and
+	// their respective predecessors
 	keyblocks *keyBlockSet
 	// Relocation engine to send keys to be relocated
 	rel *Relocator
@@ -62,26 +51,6 @@ type Fidias struct {
 // New instantiates a new instance of Fidias based on the given config and stores along with
 // a grpc server instance to register the network transports
 func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, keyvs *Keyvs, dev *RingDevice, trans *NetTransport) *Fidias {
-	//func New(conf *Config, appFSM KeyValueFSM, idx store.IndexStore, entries store.EntryStore, logStore *hexalog.LogStore, stableStore hexalog.StableStore, server *grpc.Server) (g *Fidias, err error) {
-
-	// Init the FSM
-	// var fsm KeyValueFSM
-	// if appFSM == nil {
-	// 	fsm = &DummyFSM{}
-	// } else {
-	// 	fsm = appFSM
-	// }
-
-	// Open the fsm to begin using it
-	// if err = fsm.Open(); err != nil {
-	// 	return nil, err
-	// }
-
-	// Init fidias network transport
-	//reapInt := 30 * time.Second
-	//maxIdle := conf.Ring.MaxConnIdle
-	//trans := NewNetTransport(fsm, idx, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hexalog.Hasher)
-	//RegisterFidiasRPCServer(server, trans)
 
 	fids := &Fidias{
 		conf:      conf,
@@ -93,41 +62,22 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 		fet:       fetcher,
 		shutdown:  make(chan struct{}, 1), // For relocator
 	}
+
 	// Register hexalog network transport to fetcher
 	fids.fet.RegisterTransport(hexlog.trans.remote)
 	fids.fet.RegisterHealer(hexlog)
-
-	// Register fidias transport to relocator
-	fids.rel.RegisterTransport(trans)
-	// Register keyvs transport
-	fids.keyvs.RegisterTransport(trans)
 	// Register fetch channels to fidias network transport
 	trans.Register(fetcher.fetCh, fetcher.blkCh)
 
-	// Init hexalog transport and register with gRPC
-	//logtrans := hexalog.NewNetTransport(30*time.Second, conf.Ring.MaxConnIdle)
-	//hexalog.RegisterHexalogRPCServer(server, logtrans)
+	// Register fidias transport to relocator
+	fids.rel.RegisterTransport(trans)
 
-	// Block stuff
-	// netopt:=blox.DefaultNetClientOptions(conf.Hasher())
-	// bremote:=blox.NewNetTransport(ln, netopt)
-	// bloxTrans:=blox.NewLocalTransport(host, bremote.NetClient)
-	//rdev, err := device.NewFileRawDevice()
-	//blkdev := device.NewBlockDevice(rdev)
-	// bloxTrans.Register(blkdev)
-	//dev:=NewRingDevice(replicas, hasher, bloxTrans)
+	// Register keyvs transport
+	fids.keyvs.RegisterTransport(trans)
 
 	// Set self as the chord delegate
 	conf.Ring.Delegate = fids
 
-	// Init local transport
-	// g.ftrans = &localTransport{
-	// 	host:    conf.Hostname(),
-	// 	kvlocal: fsm,
-	// 	trans:   trans,
-	// }
-
-	//err = g.initHexalog(fsm, idx, entries, logStore, stableStore, logtrans)
 	return fids
 }
 

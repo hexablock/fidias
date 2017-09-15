@@ -21,6 +21,7 @@ func setupBlockDeviceTransport(ln net.Listener, localDev *device.BlockDevice, ha
 	opts := blox.DefaultNetClientOptions(hasher)
 	remote := blox.NewNetTransport(ln, opts)
 
+	// TODO: change to use adv-address for blox
 	trans := blox.NewLocalTransport(ln.Addr().String(), remote)
 	trans.Register(localDev)
 

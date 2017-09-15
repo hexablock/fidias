@@ -111,16 +111,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to setup block device: %v", err)
 	}
+	bloxTrans := setupBlockDeviceTransport(bloxLn, bdev, conf.Hasher())
 
 	// Fetcher
-	fet := fidias.NewFetcher(index, entries, conf.Hexalog.Votes, conf.RelocateBufSize)
-	fet.RegisterBlockDevice(bdev)
+	fet := fidias.NewFetcher(index, entries, conf.Hexalog.Votes, conf.RelocateBufSize, conf.Hasher())
+	fet.RegisterBlockTransport(bloxTrans)
+
 	// Relocator
 	rel := fidias.NewRelocator(int64(conf.Hexalog.Votes), conf.Hasher())
 	rel.RegisterKeylogIndex(index)
 	rel.RegisterBlockJournal(journal)
-
-	bloxTrans := setupBlockDeviceTransport(bloxLn, bdev, conf.Hasher())
 
 	blockReplicas := 2
 	dev := fidias.NewRingDevice(blockReplicas, conf.Hasher(), bloxTrans)

@@ -102,8 +102,6 @@ func (dev *RingDevice) GetBlock(id []byte) (block.Block, error) {
 		if blk, err = dev.trans.GetBlock(string(host), id); err == nil {
 			return blk, nil
 		}
-		// TODO:
-		//break
 	}
 
 	return nil, err
