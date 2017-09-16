@@ -143,19 +143,19 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 }
 
 func TestFidias(t *testing.T) {
-	ts1, err := newTestServer("127.0.0.1:61234", "127.0.0.1:42100")
+	ts1, err := newTestServer("127.0.0.1:61234", "127.0.0.1:62100")
 	if err != nil {
 		t.Fatal(err)
 	}
 	<-time.After(100 * time.Millisecond)
 
-	ts2, err := newTestServer("127.0.0.1:61235", "127.0.0.1:42101", "127.0.0.1:61234")
+	ts2, err := newTestServer("127.0.0.1:61235", "127.0.0.1:62101", "127.0.0.1:61234")
 	if err != nil {
 		t.Fatal(err)
 	}
 	<-time.After(100 * time.Millisecond)
 
-	ts3, err := newTestServer("127.0.0.1:61236", "127.0.0.1:42102", "127.0.0.1:61235")
+	ts3, err := newTestServer("127.0.0.1:61236", "127.0.0.1:62102", "127.0.0.1:61235")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestFidias(t *testing.T) {
 
 	// New node joining
 	<-time.After(10 * time.Millisecond)
-	ts4, err := newTestServer("127.0.0.1:61237", "127.0.0.1:42103", "127.0.0.1:61234")
+	ts4, err := newTestServer("127.0.0.1:61237", "127.0.0.1:62103", "127.0.0.1:61234")
 	if err != nil {
 		t.Fatal(err)
 	}
