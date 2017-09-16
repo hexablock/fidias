@@ -30,6 +30,9 @@ This endpoint finds replica locations for a given key.
 #### /v1/hexalog/*{ key }*
 This endpoint allows operations directly against the log.  Its use is intended for admin purposes only.
 
+#### /v1/blox
+This endpoint allow operations on the content-addressable storage
+
 #### /v1/status
 This endpoint returns the status of the node.
 

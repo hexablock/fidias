@@ -1,8 +1,10 @@
 package gateways
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hexablock/blox/filesystem"
 	"github.com/hexablock/fidias"
@@ -56,7 +58,8 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := strings.TrimPrefix(r.URL.Path, server.prefix)
 	reqpath = strings.TrimPrefix(reqpath, "/")
 
-	// Blox handler.  This is dealt with here as it has a diff. definition
+	// Blox handler.  This is dealt with here as it has a different handler
+	// definition
 	if strings.HasPrefix(reqpath, "blox") {
 		server.handlerBlox(w, r, strings.TrimPrefix(reqpath, "blox/"))
 		return
@@ -91,7 +94,10 @@ func (server *HTTPServer) handleLookup(w http.ResponseWriter, r *http.Request, r
 	}
 
 	code = 200
+	start := time.Now()
 	_, data, err = server.ring.Lookup(n, []byte(resourceID))
+	end := time.Since(start)
+	headers = map[string]string{headerLookupTime: fmt.Sprintf("%v", end)}
 
 	return
 }

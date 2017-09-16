@@ -142,7 +142,7 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 		// Create key if it does not exist
 		ki, err := trans.idxs.MarkKey(keyLoc.Key, keyLoc.Marker)
 		if err != nil {
-			log.Printf("[ERROR] Failed to upsert key=%s error='%v'", keyLoc.Key, err)
+			log.Printf("[ERROR] Failed to mark key=%s error='%v'", keyLoc.Key, err)
 			continue
 		}
 

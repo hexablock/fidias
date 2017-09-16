@@ -16,16 +16,12 @@ func (fidias *Fidias) NewPredecessor(local, newPred, oldPred *chord.Vnode) {
 		return
 	}
 
-	// Send keys that need to be relocated.  This is a blocking call.
+	// Send keys/blocks that need to be relocated.  This is a blocking call for
+	// key.  Blocks are done in a seperate go-routine
 	n, rt, err := fidias.rel.relocate(local, newPred)
-	if err != nil {
-		log.Printf("[ERROR] Relocation incomplete error='%v' src=%s/%x dst=%s/%x runtime=%v", err,
-			local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt)
 
-	} else {
-		log.Printf("[INFO] Relocation complete keys=%d src=%s/%x dst=%s/%x runtime=%v", n, local.Host,
-			local.Id[:12], newPred.Host, newPred.Id[:12], rt)
-	}
+	log.Printf("[INFO] Relocated keys=%d src=%s/%x dst=%s/%x runtime=%v error='%v'",
+		n, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt, err)
 
 }
 

@@ -2,7 +2,6 @@ package fidias
 
 import (
 	"bytes"
-	"log"
 	"time"
 
 	"github.com/hexablock/blox/device"
@@ -10,6 +9,7 @@ import (
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
 // RelocatorTransport implements a transport needed by the key rebalancing engine
@@ -70,12 +70,12 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 
 	// Do this in a go-routine after keylocg relocation as it's not as critical to get the
 	// block id's across
-	//
 	go func() {
 		n, rt, err := reb.relocateBlocks(local, newPred)
-		log.Printf("[INFO] Block relocation count=%d runtime=%v error='%v'", n, rt, err)
+		log.Printf("[INFO] Relocated blocks=%d src=%s/%x dst=%s/%x runtime=%v error='%v'",
+			n, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt, err)
 	}()
-	//
+
 	return n, rt, err
 }
 

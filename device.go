@@ -2,12 +2,12 @@ package fidias
 
 import (
 	"errors"
-	"log"
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
 // Locator implements an interface to perform lookups against the cluster
