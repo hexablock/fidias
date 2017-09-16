@@ -1,14 +1,15 @@
 package fidias
 
 import (
-	"context"
 	"fmt"
+
+	"golang.org/x/net/context"
 
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
-// KVNetTransport implements a transport for key-value operations
+// KVTransport implements a transport for key-value operations
 type KVTransport interface {
 	GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error)
 }
@@ -51,26 +52,3 @@ func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []by
 	}
 	return trans.remote.GetKey(ctx, host, key)
 }
-
-// type localTransport struct {
-// 	host string
-// 	// key-value local
-// 	kvlocal KeyValueFSM
-// 	// fidias transport as a whole. it contains the required key-value calls as well
-// 	trans *NetTransport
-// }
-
-// GetKey gets a local or remote key-value pair based on the host.  It also takes a context
-// for cancellation of requests
-// func (trans *localTransport) GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error) {
-// 	if trans.host == host {
-// 		select {
-// 		case <-ctx.Done():
-// 			return nil, fmt.Errorf("GetKey context cancelled")
-// 		default:
-// 			return trans.kvlocal.Get(key)
-// 		}
-// 		//return trans.kvlocal.Get(key)
-// 	}
-// 	return trans.trans.GetKey(ctx, host, key)
-// }
