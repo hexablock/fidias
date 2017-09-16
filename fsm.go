@@ -164,11 +164,12 @@ func (fsm *BadgerKeyValueFSM) GetKey(key []byte) (*hexatype.KeyValuePair, error)
 
 	var val []byte
 
-	err = item.Value(func(v []byte) {
+	err = item.Value(func(v []byte) error {
 		if v != nil {
 			val = make([]byte, len(v))
 			copy(val, v)
 		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

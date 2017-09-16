@@ -56,9 +56,9 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := strings.TrimPrefix(r.URL.Path, server.prefix)
 	reqpath = strings.TrimPrefix(reqpath, "/")
 
-	// FS handler
-	if strings.HasPrefix(reqpath, "fs") {
-		server.handlerFS(w, r, strings.TrimPrefix(reqpath, "fs/"))
+	// Blox handler.  This is dealt with here as it has a diff. definition
+	if strings.HasPrefix(reqpath, "blox") {
+		server.handlerBlox(w, r, strings.TrimPrefix(reqpath, "blox/"))
 		return
 	}
 

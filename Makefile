@@ -23,7 +23,7 @@ deps:
 	go get -d ./...
 
 test:
-	go test -cover ./...
+	go test -cover $(shell go list ./... | grep -v /vendor/)
 
 # Build all
 dist: dist/$(NAME)d-windows.zip
