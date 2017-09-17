@@ -81,7 +81,7 @@ func configure() *fidias.Config {
 		baselog.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetFlags(log.Lmicroseconds | log.LstdFlags)
 		log.SetLevel(log.LogLevelInfo)
-		log.SetPrefix(fmt.Sprintf("|%s| ", *advAddr))
+		//log.SetPrefix(fmt.Sprintf("|%s| ", *advAddr))
 	}
 
 	// Set the hasher to sha256

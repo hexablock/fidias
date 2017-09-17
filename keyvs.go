@@ -10,13 +10,14 @@ import (
 
 type kvitemError struct {
 	loc *hexaring.Location
-	kv  *hexatype.KeyValuePair
+	kv  *KeyValuePair
 	err error
 }
 
-// Keyvs is a key-value interface based on hexalog.  It provides functions to perform
-// CRUD type operations on keys
+// Keyvs is a key-value interface that relies on Hexalog and Hexaring to provide
+// functions to perform CRUD like operations on keys
 type Keyvs struct {
+	// Needed for read requests
 	locator *hexaring.Ring
 	// Hexalog kv write operations
 	hexlog *Hexalog
@@ -24,8 +25,8 @@ type Keyvs struct {
 	trans *localKVTransport
 }
 
-// NewKeyvs inits a new instance of Keyvs.  It takes the hexalog for write ops, key-value
-// store and network transport for read ops
+// NewKeyvs inits a new instance of Keyvs.  It takes the hexalog for write ops,
+// key-value store and network transport for read ops
 func NewKeyvs(hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
 	trans := &localKVTransport{
 		host:  hexlog.conf.Hostname,
@@ -51,7 +52,8 @@ func (kv *Keyvs) RegisterTransport(remote KVTransport) {
 // GetKey requests a key from the nodes in the key peerset concurrently and returns the first
 // non-errored result.  If the key is not found in any of the locations, a ErrKeyNotFound is
 // returned
-func (kv *Keyvs) GetKey(key []byte) (kvp *hexatype.KeyValuePair, opt *hexatype.RequestOptions, err error) {
+func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOptions, err error) {
+
 	locs, err := kv.locator.LookupReplicated(key, kv.hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
@@ -89,7 +91,7 @@ func (kv *Keyvs) GetKey(key []byte) (kvp *hexatype.KeyValuePair, opt *hexatype.R
 }
 
 func (kv *Keyvs) SetKey(key, val []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
-	ballot, opt, err := kv.writeKey(key, append([]byte{OpSet}, val...))
+	ballot, opt, err := kv.submitLogEntry(key, append([]byte{OpSet}, val...))
 	if err != nil {
 		return nil, opt, err
 	}
@@ -102,7 +104,7 @@ func (kv *Keyvs) SetKey(key, val []byte) (*hexalog.FutureEntry, *hexatype.Reques
 }
 
 func (kv *Keyvs) RemoveKey(key []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
-	ballot, opt, err := kv.writeKey(key, []byte{OpDel})
+	ballot, opt, err := kv.submitLogEntry(key, []byte{OpDel})
 	if err != nil {
 		return nil, opt, err
 	}
@@ -114,7 +116,8 @@ func (kv *Keyvs) RemoveKey(key []byte) (*hexalog.FutureEntry, *hexatype.RequestO
 	return fut, opt, err
 }
 
-func (kv *Keyvs) writeKey(key []byte, data []byte) (*hexalog.Ballot, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexalog.Ballot, *hexatype.RequestOptions, error) {
+
 	entry, opts, err := kv.hexlog.NewEntry(key)
 	if err != nil {
 		return nil, opts, err
@@ -132,7 +135,7 @@ func (kv *Keyvs) writeKey(key []byte, data []byte) (*hexalog.Ballot, *hexatype.R
 // GetKey requests a key from the nodes in the key peerset concurrently and returns the first
 // non-errored result.  If the key is not found in any of the locations, a ErrKeyNotFound is
 // returned
-// func (fidias *Fidias) GetKey(key []byte) (kvp *hexatype.KeyValuePair, meta *ReMeta, err error) {
+// func (fidias *Fidias) GetKey(key []byte) (kvp *KeyValuePair, meta *ReMeta, err error) {
 // 	locs, err := fidias.locator.LookupReplicated(key, fidias.conf.Hexalog.Votes)
 // 	if err != nil {
 // 		return nil, nil, err

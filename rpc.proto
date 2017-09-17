@@ -7,7 +7,7 @@ import "github.com/hexablock/hexatype/types.proto";
 
 service FidiasRPC {
 	// Get key-value pair from remote
-    rpc GetKeyRPC(hexatype.KeyValuePair) returns (hexatype.KeyValuePair) {}
+    rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
     // Send key-location id pairs
     rpc RelocateRPC(stream KeyLocation) returns (stream KeyLocation) {}
     // Send block id and journal value
@@ -21,4 +21,11 @@ message KeyLocation {
     bytes Marker = 2;
     // Total known height of the key
     uint32 Height = 3;
+}
+
+
+message KeyValuePair {
+    bytes Key = 1;
+    bytes Value = 2;
+    hexatype.Entry Entry = 3;
 }

@@ -15,7 +15,7 @@ import (
 
 // KeyValueStore implements a key value store interface
 type KeyValueStore interface {
-	GetKey(key []byte) (*hexatype.KeyValuePair, error)
+	GetKey(key []byte) (*KeyValuePair, error)
 }
 
 type streamBase struct {
@@ -76,13 +76,13 @@ func (trans *NetTransport) Register(fetLogCh, fetBlkCh chan<- *relocateReq) {
 }
 
 // GetKey retrieves a key from a remote host
-func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error) {
+func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error) {
 	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	kvp, err := conn.client.GetKeyRPC(ctx, &hexatype.KeyValuePair{Key: key})
+	kvp, err := conn.client.GetKeyRPC(ctx, &KeyValuePair{Key: key})
 	if err != nil {
 		err = hexatype.ParseGRPCError(err)
 	}
@@ -92,7 +92,7 @@ func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) 
 }
 
 // GetKeyRPC serves a GetKey request
-func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *hexatype.KeyValuePair) (*hexatype.KeyValuePair, error) {
+func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*KeyValuePair, error) {
 	return trans.kvs.GetKey(in.Key)
 }
 

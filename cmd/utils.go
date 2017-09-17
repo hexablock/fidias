@@ -53,7 +53,7 @@ func setupStores(baseDir string) (index store.IndexStore, entries store.EntrySto
 	index = store.NewInMemIndexStore()
 	entries = store.NewInMemEntryStore()
 	stable = &store.InMemStableStore{}
-	fsm = fidias.NewInMemKeyValueFSM()
+	fsm = fidias.NewInMemFSM()
 	return
 	//}
 
@@ -82,7 +82,7 @@ func setupStores(baseDir string) (index store.IndexStore, entries store.EntrySto
 	}
 	entries = ents
 
-	fsm = fidias.NewBadgerKeyValueFSM(fdir)
+	//fsm = fidias.NewBadgerKeyValueFSM(fdir)
 	stable = store.NewBadgerStableStore(sdir)
 
 	return

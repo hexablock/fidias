@@ -6,7 +6,6 @@ import (
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
-	"github.com/hexablock/hexatype"
 )
 
 // KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
@@ -14,7 +13,7 @@ import (
 type KeyValueFSM interface {
 	hexalog.FSM
 	Open() error
-	GetKey(key []byte) (*hexatype.KeyValuePair, error)
+	GetKey(key []byte) (*KeyValuePair, error)
 	Close() error
 }
 
@@ -80,31 +79,6 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 
 	return fids
 }
-
-//func (fidias *Fidias) initHexalog(fsm KeyValueFSM, idx store.IndexStore, entries store.EntryStore, logstore *hexalog.LogStore, stable hexalog.StableStore, remote *hexalog.NetTransport) (err error) {
-//tr := fidias.trans
-// c := fidias.conf
-//
-// fidias.Hexalog = &Hexalog{
-// 	conf:          c.Hexalog,
-// 	retryInterval: c.RetryInterval,
-// 	trans: &localHexalogTransport{
-// 		host:     c.Hostname(),
-// 		logstore: logstore,
-// 		remote:   remote,
-// 	},
-// }
-//
-// fidias.Hexalog.hexlog, err = hexalog.NewHexalog(c.Hexalog, fsm, logstore, stable, remote)
-// if err == nil {
-// 	// setup log entry fetcher
-// 	fidias.fet = newFetcher(c, idx, entries, fidias.Hexalog.hexlog, remote)
-// 	// register fetch channel
-// 	fidias.ftrans.trans.Register(fidias.fet.fetCh)
-// }
-//
-// return err
-//}
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
 // ring depend on each other and the ring may not be intialized yet.  Only upon ring

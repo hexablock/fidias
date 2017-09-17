@@ -98,7 +98,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ss := &store.InMemStableStore{}
 	es := store.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
-	fsm := NewInMemKeyValueFSM()
+	fsm := NewInMemFSM()
 
 	// Hexalog
 	logNet := hexalog.NewNetTransport(3*time.Second, 3*time.Second)

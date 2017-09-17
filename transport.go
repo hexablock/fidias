@@ -11,7 +11,7 @@ import (
 
 // KVTransport implements a transport for key-value operations
 type KVTransport interface {
-	GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error)
+	GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error)
 }
 
 type localHexalogTransport struct {
@@ -41,7 +41,7 @@ type localKVTransport struct {
 	remote KVTransport
 }
 
-func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []byte) (*hexatype.KeyValuePair, error) {
+func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error) {
 	if trans.host == host {
 		select {
 		case <-ctx.Done():

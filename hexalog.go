@@ -30,7 +30,7 @@ func NewHexalog(conf *hexalog.Config, logstore *hexalog.LogStore, stable hexalog
 	// Init FSM
 	var fsm KeyValueFSM
 	if afsm == nil {
-		fsm = &DummyFSM{}
+		fsm = NewInMemFSM()
 	} else {
 		fsm = afsm
 	}
@@ -39,8 +39,6 @@ func NewHexalog(conf *hexalog.Config, logstore *hexalog.LogStore, stable hexalog
 		return nil, err
 	}
 
-	// maxIdle := 3 * time.Minute
-	// reapInterval := 30 * time.Second
 	retryInt := 10 * time.Millisecond
 	// remote := hexalog.NewNetTransport(reapInterval, maxIdle)
 
