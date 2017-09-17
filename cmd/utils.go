@@ -53,7 +53,7 @@ func setupStores(baseDir string) (index store.IndexStore, entries store.EntrySto
 	index = store.NewInMemIndexStore()
 	entries = store.NewInMemEntryStore()
 	stable = &store.InMemStableStore{}
-	fsm = fidias.NewInMemFSM()
+	fsm = fidias.NewInMemFSM(fidias.KeyValueNamespace, fidias.FileSystemNamespace)
 	return
 	//}
 

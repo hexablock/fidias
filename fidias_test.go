@@ -98,7 +98,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ss := &store.InMemStableStore{}
 	es := store.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
-	fsm := NewInMemFSM()
+	fsm := NewInMemFSM(KeyValueNamespace, FileSystemNamespace)
 
 	// Hexalog
 	logNet := hexalog.NewNetTransport(3*time.Second, 3*time.Second)
@@ -119,7 +119,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	rel.RegisterBlockJournal(ts.j)
 	rel.RegisterKeylogIndex(idx)
 	// Key-value
-	keyvs := NewKeyvs(hexlog, fsm)
+	keyvs := NewKeyvs(KeyValueNamespace, hexlog, fsm)
 
 	// Fidias
 	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
@@ -212,7 +212,7 @@ func TestFidias(t *testing.T) {
 	}
 	<-time.After(200 * time.Millisecond)
 
-	fut, meta, err := ts4.fids.keyvs.SetKey([]byte("test"), []byte("val"))
+	fut, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
 	if err != nil {
 		t.Fatal(err)
 	}

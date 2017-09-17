@@ -105,7 +105,7 @@ func main() {
 	log.Println("[INFO] Hexalog initialized")
 
 	// Key-value
-	keyvs := fidias.NewKeyvs(hexlog, fsm)
+	keyvs := fidias.NewKeyvs(fidias.KeyValueNamespace, hexlog, fsm)
 	log.Println("[INFO] Keyvs initialized")
 
 	// Blox

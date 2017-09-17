@@ -17,6 +17,8 @@ type kvitemError struct {
 // Keyvs is a key-value interface that relies on Hexalog and Hexaring to provide
 // functions to perform CRUD like operations on keys
 type Keyvs struct {
+	// namespace
+	ns []byte
 	// Needed for read requests
 	locator *hexaring.Ring
 	// Hexalog kv write operations
@@ -27,13 +29,14 @@ type Keyvs struct {
 
 // NewKeyvs inits a new instance of Keyvs.  It takes the hexalog for write ops,
 // key-value store and network transport for read ops
-func NewKeyvs(hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
+func NewKeyvs(namespace string, hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
 	trans := &localKVTransport{
 		host:  hexlog.conf.Hostname,
 		local: kvs,
 	}
 
 	return &Keyvs{
+		ns:     []byte(namespace),
 		hexlog: hexlog,
 		trans:  trans,
 	}
@@ -90,7 +93,9 @@ func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOpt
 	return
 }
 
-func (kv *Keyvs) SetKey(key, val []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) SetKey(basekey, val []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+	key := append(kv.ns, basekey...)
+
 	ballot, opt, err := kv.submitLogEntry(key, append([]byte{OpSet}, val...))
 	if err != nil {
 		return nil, opt, err
@@ -103,7 +108,9 @@ func (kv *Keyvs) SetKey(key, val []byte) (*hexalog.FutureEntry, *hexatype.Reques
 	return fut, opt, err
 }
 
-func (kv *Keyvs) RemoveKey(key []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) RemoveKey(basekey []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+	key := append(kv.ns, basekey...)
+
 	ballot, opt, err := kv.submitLogEntry(key, []byte{OpDel})
 	if err != nil {
 		return nil, opt, err

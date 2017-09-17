@@ -1,6 +1,7 @@
 package fidias
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 
@@ -25,6 +26,9 @@ const (
 // FSM interface and provides a get function to retrieve keys as all write are handled by
 // the FSM
 type InMemFSM struct {
+	kvprefix []byte
+	fsprefix []byte
+
 	// key-value pairs
 	kvLock sync.RWMutex
 	kv     map[string]*KeyValuePair
@@ -34,8 +38,8 @@ type InMemFSM struct {
 }
 
 // NewInMemFSM inits a new InMemFSM
-func NewInMemFSM() *InMemFSM {
-	return &InMemFSM{}
+func NewInMemFSM(kvprefix, fsprefix string) *InMemFSM {
+	return &InMemFSM{kvprefix: []byte(kvprefix), fsprefix: []byte(fsprefix)}
 }
 
 // Open initialized the internal data structures.  It always returns nil
@@ -80,7 +84,6 @@ func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	var (
 		op   = entry.Data[0]
 		resp interface{}
-		key  = string(entry.Key)
 	)
 
 	switch op {
@@ -88,13 +91,13 @@ func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 		resp = fsm.applySet(entry)
 
 	case OpDel:
-		resp = fsm.applyDelete(key)
+		resp = fsm.applyDelete(entry)
 
 	case OpFsSet:
 		resp = fsm.applyFSSet(entry)
 
 	case OpFsDel:
-		resp = fsm.applyFSDelete(key)
+		resp = fsm.applyFSDelete(entry)
 
 	default:
 		resp = fmt.Errorf("invalid operation: %x", op)
@@ -105,7 +108,8 @@ func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 }
 
 func (fsm *InMemFSM) applyFSSet(entry *hexatype.Entry) error {
-	ver := NewVersioned(entry.Key)
+	key := bytes.TrimPrefix(entry.Key, fsm.fsprefix)
+	ver := NewVersioned(key)
 
 	value := entry.Data[1:]
 	if err := ver.UnmarshalBinary(value); err != nil {
@@ -113,13 +117,15 @@ func (fsm *InMemFSM) applyFSSet(entry *hexatype.Entry) error {
 	}
 
 	fsm.fsLock.Lock()
-	fsm.fs[string(entry.Key)] = ver
+	fsm.fs[string(key)] = ver
 	fsm.fsLock.Unlock()
 
 	return nil
 }
 
-func (fsm *InMemFSM) applyFSDelete(key string) error {
+func (fsm *InMemFSM) applyFSDelete(entry *hexatype.Entry) error {
+	key := string(bytes.TrimPrefix(entry.Key, fsm.fsprefix))
+
 	fsm.fsLock.Lock()
 	defer fsm.fsLock.Unlock()
 
@@ -132,18 +138,21 @@ func (fsm *InMemFSM) applyFSDelete(key string) error {
 }
 
 func (fsm *InMemFSM) applySet(entry *hexatype.Entry) error {
+	key := bytes.TrimPrefix(entry.Key, fsm.kvprefix)
 	value := entry.Data[1:]
 
-	kv := &KeyValuePair{Entry: entry, Value: value, Key: entry.Key}
+	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
 
 	fsm.kvLock.Lock()
-	fsm.kv[string(entry.Key)] = kv
+	fsm.kv[string(key)] = kv
 	fsm.kvLock.Unlock()
 
 	return nil
 }
 
-func (fsm *InMemFSM) applyDelete(key string) error {
+func (fsm *InMemFSM) applyDelete(entry *hexatype.Entry) error {
+	key := string(bytes.TrimPrefix(entry.Key, fsm.kvprefix))
+
 	fsm.kvLock.Lock()
 	defer fsm.kvLock.Unlock()
 

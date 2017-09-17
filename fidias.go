@@ -8,6 +8,11 @@ import (
 	"github.com/hexablock/hexaring"
 )
 
+const (
+	KeyValueNamespace   = "keyvs/"
+	FileSystemNamespace = "fs/"
+)
+
 // KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
 // contains read-only key-value functions needed.
 type KeyValueFSM interface {
