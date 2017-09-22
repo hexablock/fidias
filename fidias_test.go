@@ -98,13 +98,13 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ss := &store.InMemStableStore{}
 	es := store.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
-	fsm := NewInMemFSM(KeyValueNamespace, FileSystemNamespace)
+	fsm := NewFSM(ts.c.KeyValueNamespace, ts.c.FileSystemNamespace)
 
 	// Hexalog
 	logNet := hexalog.NewNetTransport(3*time.Second, 3*time.Second)
 	hexalog.RegisterHexalogRPCServer(ts.g, logNet)
 
-	hexlog, err := NewHexalog(ts.c.Hexalog, ls, ss, fsm, logNet)
+	hexlog, err := NewHexalog(ts.c, ls, ss, fsm, logNet)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	rel.RegisterBlockJournal(ts.j)
 	rel.RegisterKeylogIndex(idx)
 	// Key-value
-	keyvs := NewKeyvs(KeyValueNamespace, hexlog, fsm)
+	keyvs := NewKeyvs(ts.c.KeyValueNamespace, hexlog, fsm)
 
 	// Fidias
 	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())

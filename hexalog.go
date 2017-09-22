@@ -11,28 +11,34 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
+// FSM interface implements a KeyValue as well as a FileSystem FSM
+// type FSM interface {
+// 	hexalog.FSM
+// 	Open() error
+// 	GetKey(key []byte) (*KeyValuePair, error)
+// 	GetPath(name string) (*VersionedFile, error)
+// 	Close() error
+// }
+
 // Hexalog is a ring/cluster aware Hexalog.
 type Hexalog struct {
-	// hexalog config
-	conf *hexalog.Config
+	conf     *hexalog.Config        // Hexalog config
+	retryInt time.Duration          // Proposal retry interval
+	hexlog   *hexalog.Hexalog       // Hexalog instance
+	trans    *localHexalogTransport // Hexalog local and remote transport
 
-	// proposal retry interval
-	retryInt time.Duration
-
-	locator *hexaring.Ring
-
-	hexlog *hexalog.Hexalog
-	trans  *localHexalogTransport
+	dht DHT
 }
 
-// remote must be registered to grpc before init'ing hexalog
-func NewHexalog(conf *hexalog.Config, logstore *hexalog.LogStore, stable hexalog.StableStore, afsm KeyValueFSM, remote *hexalog.NetTransport) (*Hexalog, error) {
+// NewHexalog inits a new fidias hexalog instance attached to the ring.  Remote must
+// be registered to grpc before init'ing hexalog
+func NewHexalog(conf *Config, logstore *hexalog.LogStore, stable hexalog.StableStore, f *FSM, remote *hexalog.NetTransport) (*Hexalog, error) {
 	// Init FSM
-	var fsm KeyValueFSM
-	if afsm == nil {
-		fsm = NewInMemFSM(KeyValueNamespace, FileSystemNamespace)
+	var fsm *FSM
+	if f == nil {
+		fsm = NewFSM(conf.KeyValueNamespace, conf.FileSystemNamespace)
 	} else {
-		fsm = afsm
+		fsm = f
 	}
 	// Make it available for use
 	if err := fsm.Open(); err != nil {
@@ -42,20 +48,20 @@ func NewHexalog(conf *hexalog.Config, logstore *hexalog.LogStore, stable hexalog
 	retryInt := 10 * time.Millisecond
 	// remote := hexalog.NewNetTransport(reapInterval, maxIdle)
 
-	hexlog, err := hexalog.NewHexalog(conf, fsm, logstore, stable, remote)
+	hexlog, err := hexalog.NewHexalog(conf.Hexalog, fsm, logstore, stable, remote)
 	if err != nil {
 		return nil, err
 	}
 	remote.Register(hexlog)
 
 	trans := &localHexalogTransport{
-		host:     conf.Hostname,
+		host:     conf.Hostname(),
 		logstore: logstore,
 		remote:   remote,
 	}
 
 	hexl := &Hexalog{
-		conf:     conf,
+		conf:     conf.Hexalog,
 		hexlog:   hexlog,
 		retryInt: retryInt,
 		trans:    trans,
@@ -64,9 +70,9 @@ func NewHexalog(conf *hexalog.Config, logstore *hexalog.LogStore, stable hexalog
 	return hexl, nil
 }
 
-// Register registers the locator to hexalog
-func (hexlog *Hexalog) Register(locator *hexaring.Ring) {
-	hexlog.locator = locator
+// RegisterDHT registers the DHT to hexalog
+func (hexlog *Hexalog) RegisterDHT(dht DHT) {
+	hexlog.dht = dht
 }
 
 // MinVotes returns the minimum number of required votes for a proposal and commit
@@ -78,7 +84,7 @@ func (hexlog *Hexalog) MinVotes() int {
 // the node is not part of the location set or a lookup error occurs
 func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 	// Lookup locations for this key
-	locs, err := hexlog.locator.LookupReplicated(key, hexlog.MinVotes())
+	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -127,7 +133,7 @@ func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.Reques
 // upto the max allowed successors for each location.
 func (hexlog *Hexalog) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReMeta, err error) {
 	meta = &ReMeta{}
-	_, err = hexlog.locator.ScourReplicatedKey(key, hexlog.MinVotes(), func(vn *chord.Vnode) error {
+	_, err = hexlog.dht.ScourReplicatedKey(key, hexlog.MinVotes(), func(vn *chord.Vnode) error {
 		ent, er := hexlog.trans.GetEntry(vn.Host, key, id)
 		if er == nil {
 			entry = ent
@@ -153,6 +159,8 @@ func (hexlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.K
 	return hexlog.hexlog.Leader(key, locs)
 }
 
+// Heal submits a heal request for the given key to the local note.  It consults the supplied
+// PeerSet in order to perform the heal.
 func (hexlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
 	return hexlog.hexlog.Heal(key, opts)
 }

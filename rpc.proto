@@ -6,7 +6,7 @@ import "github.com/hexablock/hexatype/types.proto";
 //import "github.com/hexablock/go-chord/net.proto";
 
 service FidiasRPC {
-	// Get key-value pair from remote
+    // Get key-value pair from remote
     rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
     // Send key-location id pairs
     rpc RelocateRPC(stream KeyLocation) returns (stream KeyLocation) {}

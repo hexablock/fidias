@@ -9,7 +9,7 @@ import (
 )
 
 // keyblock is a block of keys around the ring between the left and right hashes including
-// the right hash.  this is vnode and its predecessor id vica-versa
+// the right hash.  This is the vnode and predecessor id vica-versa
 type keyBlock struct {
 	pred  *chord.Vnode
 	local *chord.Vnode

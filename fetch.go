@@ -8,7 +8,6 @@ import (
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexalog/store"
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -22,7 +21,7 @@ type FetcherTransport interface {
 }
 
 type Fetcher struct {
-	locator *hexaring.Ring
+	dht DHT
 	// Used specifically to submit heal request
 	heal Healer
 	// Hexalog stores
@@ -57,10 +56,10 @@ func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize in
 	}
 }
 
-// RegisterLocator registers the locator to the fetcher and starts the fetch loop.  This
+// RegisterDHT registers the DHT to the fetcher and starts the fetch loop.  This
 // must be called after the transport and healer interfaces have been registered.
-func (fet *Fetcher) RegisterLocator(locator *hexaring.Ring) {
-	fet.locator = locator
+func (fet *Fetcher) RegisterDHT(dht DHT) {
+	fet.dht = dht
 	fet.start()
 }
 
@@ -131,7 +130,7 @@ func (fet *Fetcher) fetchKeys() {
 func (fet *Fetcher) checkKeys() {
 	for key := range fet.chkCh {
 
-		locs, err := fet.locator.LookupReplicated(key, fet.replicas)
+		locs, err := fet.dht.LookupReplicated(key, fet.replicas)
 		if err != nil {
 			log.Printf("[ERROR] Key check failed key=%s error='%v'", key, err)
 			continue

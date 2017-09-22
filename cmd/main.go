@@ -88,7 +88,7 @@ func main() {
 	ring.RegisterServer(gserver)
 
 	// Init log store with fsm
-	index, entries, stable, fsm, err := setupStores(*dataDir)
+	index, entries, stable, fsm, err := setupStores(conf, *dataDir)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to load stored: %v", err)
 	}
@@ -97,7 +97,7 @@ func main() {
 	lognet := hexalog.NewNetTransport(reapInt, maxIdle)
 	hexalog.RegisterHexalogRPCServer(gserver, lognet)
 
-	hexlog, err := fidias.NewHexalog(conf.Hexalog, logstore, stable, fsm, lognet)
+	hexlog, err := fidias.NewHexalog(conf, logstore, stable, fsm, lognet)
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to initialize hexalog: %v", err)
 	}
@@ -105,7 +105,7 @@ func main() {
 	log.Println("[INFO] Hexalog initialized")
 
 	// Key-value
-	keyvs := fidias.NewKeyvs(fidias.KeyValueNamespace, hexlog, fsm)
+	keyvs := fidias.NewKeyvs(conf.KeyValueNamespace, hexlog, fsm)
 	log.Println("[INFO] Keyvs initialized")
 
 	// Blox

@@ -37,10 +37,10 @@ func TestRingDevice(t *testing.T) {
 	<-time.After(300 * time.Millisecond)
 
 	ringDev := NewRingDevice(3, ts1.hasher, ts1.btrans)
-	ringDev.Register(ts1.r)
+	ringDev.RegisterDHT(ts1.r)
 	fs := filesystem.NewBloxFS(ringDev)
 
-	if ringDev.locator == nil {
+	if ringDev.dht == nil {
 		t.Fatal("ring should not be nil")
 	}
 

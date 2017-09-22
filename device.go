@@ -5,7 +5,6 @@ import (
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -22,7 +21,7 @@ var errBloxAddrMissing = errors.New("blox address missing")
 // RingDevice implements the blox.BlockDevice interface backed by hexaring to distribute
 // blocks into the cluster.  The filesystem uses this as its underlying device.
 type RingDevice struct {
-	locator *hexaring.Ring
+	dht DHT
 	// Number of block replicas
 	replicas int
 	hasher   hexatype.Hasher
@@ -48,7 +47,7 @@ func (dev *RingDevice) Hasher() hexatype.Hasher {
 // SetBlock writes the block to the device
 func (dev *RingDevice) SetBlock(blk block.Block) ([]byte, error) {
 
-	locs, err := dev.locator.LookupReplicatedHash(blk.ID(), dev.replicas)
+	locs, err := dev.dht.LookupReplicatedHash(blk.ID(), dev.replicas)
 	//log.Printf("Setting block id=%x %v", blk.ID(), err)
 	if err != nil {
 		return nil, err
@@ -86,7 +85,7 @@ func (dev *RingDevice) SetBlock(blk block.Block) ([]byte, error) {
 
 // GetBlock gets a block from the device
 func (dev *RingDevice) GetBlock(id []byte) (block.Block, error) {
-	locs, err := dev.locator.LookupReplicatedHash(id, dev.replicas)
+	locs, err := dev.dht.LookupReplicatedHash(id, dev.replicas)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +108,7 @@ func (dev *RingDevice) GetBlock(id []byte) (block.Block, error) {
 
 // RemoveBlock submits a request to remove a block on the device and all replicas
 func (dev *RingDevice) RemoveBlock(id []byte) error {
-	locs, err := dev.locator.LookupReplicatedHash(id, dev.replicas)
+	locs, err := dev.dht.LookupReplicatedHash(id, dev.replicas)
 	if err != nil {
 		return err
 	}
@@ -136,8 +135,8 @@ func (dev *RingDevice) Close() error {
 	return dev.trans.Shutdown()
 }
 
-// Register registers the hexaing to the ring device.  This device is only usable once a call
+// RegisterDHT registers the DHT ring device.  This device is only usable once a call
 // to register has been made.
-func (dev *RingDevice) Register(locator *hexaring.Ring) {
-	dev.locator = locator
+func (dev *RingDevice) RegisterDHT(dht DHT) {
+	dev.dht = dht
 }

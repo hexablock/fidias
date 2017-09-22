@@ -20,7 +20,7 @@ type Keyvs struct {
 	// namespace
 	ns []byte
 	// Needed for read requests
-	locator *hexaring.Ring
+	dht DHT
 	// Hexalog kv write operations
 	hexlog *Hexalog
 	// Transport for kv read operations
@@ -28,7 +28,8 @@ type Keyvs struct {
 }
 
 // NewKeyvs inits a new instance of Keyvs.  It takes the hexalog for write ops,
-// key-value store and network transport for read ops
+// key-value store and network transport for read ops.  namespace is used to
+// prefix all keys.
 func NewKeyvs(namespace string, hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
 	trans := &localKVTransport{
 		host:  hexlog.conf.Hostname,
@@ -42,9 +43,9 @@ func NewKeyvs(namespace string, hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
 	}
 }
 
-// RegisterLocator registers the locator interface
-func (kv *Keyvs) RegisterLocator(locator *hexaring.Ring) {
-	kv.locator = locator
+// RegisterRing registers the ring to the keyvalue store
+func (kv *Keyvs) RegisterDHT(dht DHT) {
+	kv.dht = dht
 }
 
 // RegisterTransport registers the remote transport to use.
@@ -56,8 +57,9 @@ func (kv *Keyvs) RegisterTransport(remote KVTransport) {
 // non-errored result.  If the key is not found in any of the locations, a ErrKeyNotFound is
 // returned
 func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOptions, err error) {
+	nskey := append(kv.ns, key...)
 
-	locs, err := kv.locator.LookupReplicated(key, kv.hexlog.MinVotes())
+	locs, err := kv.dht.LookupReplicated(nskey, kv.hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
 	}

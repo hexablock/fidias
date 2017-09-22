@@ -6,8 +6,8 @@ import (
 )
 
 func TestVersioned(t *testing.T) {
-	vkey := NewVersioned([]byte("key"))
-	version := &Version{Name: "head", ID: []byte("12345678901234567890123456789012")}
+	vkey := NewVersionedFile([]byte("key"))
+	version := &FileVersion{Alias: "head", ID: []byte("12345678901234567890123456789012")}
 	if err := vkey.AddVersion(version); err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestVersioned(t *testing.T) {
 		t.Fatalf("should have 1")
 	}
 
-	v2 := &Version{Name: "name", ID: []byte("123456765434567654456765y")}
+	v2 := &FileVersion{Alias: "name", ID: []byte("123456765434567654456765y")}
 	if err := vkey.UpdateVersion(v2); err != ErrVersionNotFound {
 		t.Fatal("should fail with", ErrVersionNotFound, err)
 	}
@@ -33,7 +33,7 @@ func TestVersioned(t *testing.T) {
 
 	b, _ := vkey.MarshalBinary()
 
-	vkey1 := &Versioned{}
+	vkey1 := &VersionedFile{}
 
 	if err := vkey1.UnmarshalBinary(b); err != nil {
 		t.Fatal(err)
@@ -45,7 +45,7 @@ func TestVersioned(t *testing.T) {
 			t.Fatal("key not found", k)
 		}
 
-		if v1.Name != v.Name {
+		if v1.Alias != v.Alias {
 			t.Fatal("name mismatch")
 		}
 		if bytes.Compare(v1.ID, v.ID) != 0 {

@@ -3,24 +3,10 @@ package fidias
 import (
 	"log"
 
+	"github.com/hexablock/blox/filesystem"
 	"github.com/hexablock/go-chord"
-	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 )
-
-const (
-	KeyValueNamespace   = "keyvs/"
-	FileSystemNamespace = "fs/"
-)
-
-// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
-// contains read-only key-value functions needed.
-type KeyValueFSM interface {
-	hexalog.FSM
-	Open() error
-	GetKey(key []byte) (*KeyValuePair, error)
-	Close() error
-}
 
 // ReMeta contains metadata associated to a request or response
 type ReMeta struct {
@@ -41,6 +27,8 @@ type Fidias struct {
 	keyvs *Keyvs
 	// Ring backed BlockDevice
 	dev *RingDevice
+	// Filesystem
+	fs *FileSystem
 	// Blocks of keys this node is responsible for. These are the local vnodes and
 	// their respective predecessors
 	keyblocks *keyBlockSet
@@ -69,7 +57,10 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 
 	// Register hexalog network transport to fetcher
 	fids.fet.RegisterTransport(hexlog.trans.remote)
+
+	// Register hexalog healer to fetcher
 	fids.fet.RegisterHealer(hexlog)
+
 	// Register fetch channels to fidias network transport
 	trans.Register(fetcher.fetCh, fetcher.blkCh)
 
@@ -92,18 +83,22 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 	fidias.ring = ring
 
 	// Register dht to hexalog
-	fidias.hexlog.Register(ring)
+	fidias.hexlog.RegisterDHT(ring)
+	// Register dht to key-value
+	fidias.keyvs.RegisterDHT(ring)
 
-	// Register to key-value
-	fidias.keyvs.RegisterLocator(ring)
-
-	// Register dht to storage device if enabled
+	// Register dht to storage device if enabled.  Only init FS is device is initialized
 	if fidias.dev != nil {
-		fidias.dev.Register(ring)
-	}
+		fidias.dev.RegisterDHT(ring)
 
+		bloxfs := filesystem.NewBloxFS(fidias.dev)
+		fidias.fs = NewFileSystem(fidias.conf.Hostname(), fidias.conf.FileSystemNamespace, fidias.hexlog, bloxfs, nil)
+		fidias.fs.RegisterDHT(ring)
+
+		log.Printf("[INFO] File system initialized")
+	}
 	// Register dht to fetcher
-	fidias.fet.RegisterLocator(ring)
+	fidias.fet.RegisterDHT(ring)
 
 	log.Println("[INFO] Fidias intializied")
 }

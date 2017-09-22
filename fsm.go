@@ -1,9 +1,7 @@
 package fidias
 
 import (
-	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/hexablock/hexatype"
 )
@@ -22,61 +20,66 @@ const (
 	OpFsDel
 )
 
-// InMemFSM is a hexalog FSM for an in-memory key-value store.  It implements the
-// FSM interface and provides a get function to retrieve keys as all write are handled by
-// the FSM
-type InMemFSM struct {
-	kvprefix []byte
-	fsprefix []byte
-
-	// key-value pairs
-	kvLock sync.RWMutex
-	kv     map[string]*KeyValuePair
-	// fs
-	fsLock sync.RWMutex
-	fs     map[string]*Versioned
+// FileSystemFSM implements an FSM to manage a versioned file-system.  It is responsible
+// for applying log entries to provide a VersionedFile file-system view.
+type FileSystemFSM interface {
+	// Get a VersionedFile by name
+	Get(name string) (*VersionedFile, error)
+	// ApplySet is called when an entry needs to be applied. It is called
+	// with the entry and the extracted value from the entry. It should
+	// use the value bytes as the data payload
+	ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error
+	// ApplyDelete is called when a delete entry to needs to be applied
+	// It should remove the key and all versions given by the entry key
+	ApplyDelete(entry *hexatype.Entry) error
 }
 
-// NewInMemFSM inits a new InMemFSM
-func NewInMemFSM(kvprefix, fsprefix string) *InMemFSM {
-	return &InMemFSM{kvprefix: []byte(kvprefix), fsprefix: []byte(fsprefix)}
+// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
+// contains read-only key-value functions needed.
+type KeyValueFSM interface {
+	// Get a key
+	Get(key []byte) (*KeyValuePair, error)
+	// Apply a set operation entry with value containing the data
+	ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error
+	// Apply a delete entry
+	ApplyDelete(entry *hexatype.Entry) error
+}
+
+// FSM is a hexalog FSM for an in-memory key-value store.  It implements the
+// FSM interface and provides a get function to retrieve keys as all write are handled by
+// the FSM
+type FSM struct {
+	kv KeyValueFSM   // FSM for key-value pairs
+	fs FileSystemFSM // FSM for filesystem
+}
+
+// NewFSM inits a new FSM
+func NewFSM(kvprefix, fsprefix string) *FSM {
+	return &FSM{
+		kv: NewInMemKeyValueFSM(kvprefix),
+		fs: NewInMemVersionedFileFSM(fsprefix),
+	}
 }
 
 // Open initialized the internal data structures.  It always returns nil
-func (fsm *InMemFSM) Open() error {
-	fsm.kv = make(map[string]*KeyValuePair)
-	fsm.fs = make(map[string]*Versioned)
+func (fsm *FSM) Open() error {
 	return nil
 }
 
 // GetKey gets a value for the key.  It reads it directly from the stored log entry
-func (fsm *InMemFSM) GetKey(key []byte) (*KeyValuePair, error) {
-	fsm.kvLock.RLock()
-	defer fsm.kvLock.RUnlock()
-
-	value, ok := fsm.kv[string(key)]
-	if ok {
-		return value, nil
-	}
-	return nil, hexatype.ErrKeyNotFound
+func (fsm *FSM) GetKey(key []byte) (*KeyValuePair, error) {
+	return fsm.kv.Get(key)
 }
 
 // GetPath returns a path with pointers to all of its versions
-func (fsm *InMemFSM) GetPath(name string) (*Versioned, error) {
-	fsm.fsLock.RLock()
-	defer fsm.fsLock.RUnlock()
-
-	value, ok := fsm.fs[name]
-	if ok {
-		return value, nil
-	}
-	return nil, fmt.Errorf("path not found: %s", name)
+func (fsm *FSM) GetPath(name string) (*VersionedFile, error) {
+	return fsm.fs.Get(name)
 }
 
-// Apply applies the given entry to the InMemFSM.  entryID is the hash id of the entry.
+// Apply applies the given entry to the FSM.  entryID is the hash id of the entry.
 // The first byte in entry.Data contains the operation to be performed followed by the
 // actual value.
-func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
+func (fsm *FSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil
 	}
@@ -88,16 +91,16 @@ func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 
 	switch op {
 	case OpSet:
-		resp = fsm.applySet(entry)
+		resp = fsm.kv.ApplySet(entryID, entry, entry.Data[1:])
 
 	case OpDel:
-		resp = fsm.applyDelete(entry)
+		resp = fsm.kv.ApplyDelete(entry)
 
 	case OpFsSet:
-		resp = fsm.applyFSSet(entry)
+		resp = fsm.fs.ApplySet(entryID, entry, entry.Data[1:])
 
 	case OpFsDel:
-		resp = fsm.applyFSDelete(entry)
+		resp = fsm.fs.ApplyDelete(entry)
 
 	default:
 		resp = fmt.Errorf("invalid operation: %x", op)
@@ -107,65 +110,8 @@ func (fsm *InMemFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	return resp
 }
 
-func (fsm *InMemFSM) applyFSSet(entry *hexatype.Entry) error {
-	key := bytes.TrimPrefix(entry.Key, fsm.fsprefix)
-	ver := NewVersioned(key)
-
-	value := entry.Data[1:]
-	if err := ver.UnmarshalBinary(value); err != nil {
-		return err
-	}
-
-	fsm.fsLock.Lock()
-	fsm.fs[string(key)] = ver
-	fsm.fsLock.Unlock()
-
-	return nil
-}
-
-func (fsm *InMemFSM) applyFSDelete(entry *hexatype.Entry) error {
-	key := string(bytes.TrimPrefix(entry.Key, fsm.fsprefix))
-
-	fsm.fsLock.Lock()
-	defer fsm.fsLock.Unlock()
-
-	if _, ok := fsm.fs[key]; !ok {
-		return fmt.Errorf("path not found: %s", key)
-	}
-
-	delete(fsm.fs, key)
-	return nil
-}
-
-func (fsm *InMemFSM) applySet(entry *hexatype.Entry) error {
-	key := bytes.TrimPrefix(entry.Key, fsm.kvprefix)
-	value := entry.Data[1:]
-
-	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
-
-	fsm.kvLock.Lock()
-	fsm.kv[string(key)] = kv
-	fsm.kvLock.Unlock()
-
-	return nil
-}
-
-func (fsm *InMemFSM) applyDelete(entry *hexatype.Entry) error {
-	key := string(bytes.TrimPrefix(entry.Key, fsm.kvprefix))
-
-	fsm.kvLock.Lock()
-	defer fsm.kvLock.Unlock()
-
-	if _, ok := fsm.kv[key]; !ok {
-		return fmt.Errorf("key not found: %s", key)
-	}
-
-	delete(fsm.kv, key)
-	return nil
-}
-
 // Close is a no-op to satisfy the KeyValueFSM interface
-func (fsm *InMemFSM) Close() error {
+func (fsm *FSM) Close() error {
 	return nil
 }
 
