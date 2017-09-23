@@ -1,0 +1,10 @@
+#!/bin/bash
+
+source $(dirname $0)/common.sh
+
+locations=`curl -s ${host}/v1/locate/${key} | jq -r .[].Vnode.Meta.http | xargs`
+
+for loc in $locations; do
+  echo "$loc";
+  curl -s "${loc}/v1/hexalog/${key}" | jq -r . ;
+done

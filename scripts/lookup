@@ -1,0 +1,12 @@
+#!/bin/bash
+
+source $(dirname $0)/common.sh
+
+USAGE="\n  Usage: $0 <key>\n"
+
+if [ "${#@}" -ne 1 ]; then
+  echo -e "${USAGE}"
+  exit 2;
+fi
+
+curl -v ${host}/${p_lookup}/${key} | jq -r .

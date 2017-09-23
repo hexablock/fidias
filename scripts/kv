@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# This script is a fidias key value client using the fidias http gateway.
+#
+
+source $(dirname $0)/common.sh
+
+USAGE="\n  Usage: $0 <key> [ value ]\n"
+
+if [ "${#@}" -gt 2 ]; then
+  echo -e "${USAGE}"
+  exit 2;
+fi 
+
+case $op in
+  r)
+    curl -v -L ${host}/${p_kv}/${key} | jq .
+    ;;
+  w)
+    curl -v -L ${host}/${p_kv}/${key} --data-binary "${value}" | jq .
+    ;;
+esac
