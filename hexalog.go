@@ -11,15 +11,6 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// FSM interface implements a KeyValue as well as a FileSystem FSM
-// type FSM interface {
-// 	hexalog.FSM
-// 	Open() error
-// 	GetKey(key []byte) (*KeyValuePair, error)
-// 	GetPath(name string) (*VersionedFile, error)
-// 	Close() error
-// }
-
 // Hexalog is a ring/cluster aware Hexalog.
 type Hexalog struct {
 	conf     *hexalog.Config        // Hexalog config
@@ -80,13 +71,11 @@ func (hexlog *Hexalog) MinVotes() int {
 	return hexlog.conf.Votes
 }
 
-// NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
-// the node is not part of the location set or a lookup error occurs
-func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (hexlog *Hexalog) buildOption(key []byte) (*hexatype.RequestOptions, error) {
 	// Lookup locations for this key
 	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Check and set source index
@@ -97,12 +86,45 @@ func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestO
 			break
 		}
 	}
+
 	// Check we are a member of the set
 	if opt.SourceIndex < 0 {
-		return nil, opt, fmt.Errorf("host not in set: %s", hexlog.conf.Hostname)
+		return opt, fmt.Errorf("host not in set: %s", hexlog.conf.Hostname)
 	}
 
-	return hexlog.hexlog.New(key), opt, nil
+	return opt, nil
+}
+
+// NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
+// the node is not part of the location set or a lookup error occurs
+func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+
+	opt, err := hexlog.buildOption(key)
+	if err == nil {
+		return hexlog.hexlog.New(key), opt, nil
+	}
+
+	return nil, opt, err
+}
+
+// NewEntryFrom creates a new entry based on the given entry.  It uses the
+// given height and previous hash of the entry to determine the values for
+// the new entry.  This is essentially a compare and set
+func (hexlog *Hexalog) NewEntryFrom(entry *hexatype.Entry) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+
+	opt, err := hexlog.buildOption(entry.Key)
+	if err != nil {
+		return nil, opt, err
+	}
+
+	nentry := &hexatype.Entry{
+		Key:       entry.Key,
+		Previous:  entry.Hash(hexlog.conf.Hasher.New()),
+		Height:    entry.Height + 1,
+		Timestamp: uint64(time.Now().UnixNano()),
+	}
+
+	return nentry, opt, nil
 }
 
 // ProposeEntry finds locations for the entry and proposes it to those locations.  It retries

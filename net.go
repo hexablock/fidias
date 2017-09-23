@@ -13,9 +13,10 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// KeyValueStore implements a key value store interface
-type KeyValueStore interface {
-	GetKey(key []byte) (*KeyValuePair, error)
+// LocalStore implements all local calls needed by the network transport
+type LocalStore interface {
+	KeyValueStore
+	VersionedFileStore
 }
 
 type streamBase struct {
@@ -42,9 +43,10 @@ type RelocateBlocksStream struct {
 
 // NetTransport implements a network transport needed for fidias
 type NetTransport struct {
-	kvs     KeyValueStore
-	idxs    store.IndexStore
-	journal device.Journal
+	local LocalStore
+
+	idxs    store.IndexStore // hexalog index store
+	journal device.Journal   // BlockDevice journal
 
 	replicas int
 	hasher   hexatype.Hasher
@@ -58,9 +60,9 @@ type NetTransport struct {
 }
 
 // NewNetTransport instantiates a new network transport using the given key-value store.
-func NewNetTransport(kvs KeyValueStore, idx store.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
+func NewNetTransport(localStore LocalStore, idx store.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
 	return &NetTransport{
-		kvs:      kvs,
+		local:    localStore,
 		idxs:     idx,
 		journal:  journal,
 		replicas: replicas,
@@ -91,9 +93,51 @@ func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) 
 	return kvp, err
 }
 
+func (trans *NetTransport) GetPath(ctx context.Context, host string, name string) (*VersionedFile, error) {
+	conn, err := trans.pool.getConn(host)
+	if err != nil {
+		return nil, err
+	}
+	defer trans.pool.returnConn(conn)
+
+	req := &PathRPC{Name: name}
+	resp, err := conn.client.GetPathRPC(ctx, req)
+	if err != nil {
+		return nil, hexatype.ParseGRPCError(err)
+	}
+
+	verf := NewVersionedFile(resp.Name)
+	verf.entry = resp.Entry
+	for _, ver := range resp.Versions {
+		if err = verf.AddVersion(ver); err != nil {
+			break
+		}
+	}
+
+	return verf, err
+}
+
 // GetKeyRPC serves a GetKey request
 func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*KeyValuePair, error) {
-	return trans.kvs.GetKey(in.Key)
+	return trans.local.GetKey(in.Key)
+}
+
+// GetPathRPC serves a GetPath request
+func (trans *NetTransport) GetPathRPC(ctx context.Context, in *PathRPC) (*PathRPC, error) {
+	verfile, err := trans.local.GetPath(in.Name)
+
+	resp := &PathRPC{}
+	if err == nil {
+		resp.Entry = verfile.entry
+		resp.Versions = make([]*FileVersion, len(verfile.versions))
+		var i int
+		for _, ver := range verfile.versions {
+			resp.Versions[i] = ver
+			i++
+		}
+	}
+
+	return resp, err
 }
 
 // GetRelocateStream gets a stream to send relocation keys

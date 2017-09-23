@@ -3,7 +3,6 @@ package fidias
 import (
 	"log"
 
-	"github.com/hexablock/blox/filesystem"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexaring"
 )
@@ -23,12 +22,15 @@ type Fidias struct {
 	ring *hexaring.Ring
 	// Ring backed hexalog
 	hexlog *Hexalog
+	// FSM for both keyvs and the file-system
+	fsm *FSM
 	// Key-value interface
 	keyvs *Keyvs
 	// Ring backed BlockDevice
 	dev *RingDevice
 	// Filesystem
 	fs *FileSystem
+
 	// Blocks of keys this node is responsible for. These are the local vnodes and
 	// their respective predecessors
 	keyblocks *keyBlockSet
@@ -42,11 +44,13 @@ type Fidias struct {
 
 // New instantiates a new instance of Fidias based on the given config and stores along with
 // a grpc server instance to register the network transports
-func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, keyvs *Keyvs, dev *RingDevice, trans *NetTransport) *Fidias {
+func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher *Fetcher,
+	keyvs *Keyvs, dev *RingDevice, trans *NetTransport) *Fidias {
 
 	fids := &Fidias{
 		conf:      conf,
 		hexlog:    hexlog,
+		fsm:       fsm,
 		keyvs:     keyvs,
 		dev:       dev,
 		keyblocks: newKeyBlockSet(),
@@ -54,6 +58,9 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 		fet:       fetcher,
 		shutdown:  make(chan struct{}, 1), // For relocator
 	}
+
+	//bloxfs := filesystem.NewBloxFS(fidias.dev)
+	//fids.fs = NewFileSystem(conf.Hostname(), conf.FileSystemNamespace, hexlog, bloxfs, fsm)
 
 	// Register hexalog network transport to fetcher
 	fids.fet.RegisterTransport(hexlog.trans.remote)
@@ -70,10 +77,23 @@ func New(conf *Config, hexlog *Hexalog, relocator *Relocator, fetcher *Fetcher, 
 	// Register keyvs transport
 	fids.keyvs.RegisterTransport(trans)
 
+	if dev != nil {
+
+		fids.fs = NewFileSystem(conf.Hostname(), conf.FileSystemNamespace,
+			dev, hexlog, fsm)
+		// Register file-system transport
+		fids.fs.RegisterTransport(trans)
+
+	}
+
 	// Set self as the chord delegate
 	conf.Ring.Delegate = fids
 
 	return fids
+}
+
+func (fidias *Fidias) FileSystem() *FileSystem {
+	return fidias.fs
 }
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
@@ -89,10 +109,8 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 
 	// Register dht to storage device if enabled.  Only init FS is device is initialized
 	if fidias.dev != nil {
-		fidias.dev.RegisterDHT(ring)
 
-		bloxfs := filesystem.NewBloxFS(fidias.dev)
-		fidias.fs = NewFileSystem(fidias.conf.Hostname(), fidias.conf.FileSystemNamespace, fidias.hexlog, bloxfs, nil)
+		fidias.dev.RegisterDHT(ring)
 		fidias.fs.RegisterDHT(ring)
 
 		log.Printf("[INFO] File system initialized")

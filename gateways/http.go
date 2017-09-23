@@ -47,7 +47,7 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, k
 		"locate":  s.handleLocate,   // Replicated lookups
 		"lookup":  s.handleLookup,   // Chord lookups
 		"hexalog": s.handleHexalog,  // Hexalog interations
-		"keyvs":   s.handleKeyValue, // Key-value operations
+		"kv":      s.handleKeyValue, // Key-value operations
 		"status":  s.handleStatus,   // Overall status
 	}
 
@@ -61,7 +61,10 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Blox handler.  This is dealt with here as it has a different handler
 	// definition then the rest
 	if strings.HasPrefix(reqpath, "blox") {
-		server.handlerBlox(w, r, strings.TrimPrefix(reqpath, "blox/"))
+		server.handleBlox(w, r, strings.TrimPrefix(reqpath, "blox/"))
+		return
+	} else if strings.HasPrefix(reqpath, "fs") {
+		server.handleFS(w, r, strings.TrimPrefix(reqpath, "fs/"))
 		return
 	}
 

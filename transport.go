@@ -9,8 +9,8 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
-// KVTransport implements a transport for key-value operations
-type KVTransport interface {
+// KeyValueTransport implements a transport for key-value operations
+type KeyValueTransport interface {
 	GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error)
 }
 
@@ -42,7 +42,7 @@ func (trans *localHexalogTransport) LastEntry(host string, key []byte) (*hexatyp
 type localKVTransport struct {
 	host   string
 	local  KeyValueStore
-	remote KVTransport
+	remote KeyValueTransport
 }
 
 func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error) {
@@ -59,7 +59,7 @@ func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []by
 
 type localFileSystemTransport struct {
 	host   string
-	local  FileSystemFSM
+	local  VersionedFileStore
 	remote FileSystemTransport
 }
 
@@ -69,7 +69,7 @@ func (trans *localFileSystemTransport) GetPath(ctx context.Context, host string,
 		case <-ctx.Done():
 			return nil, fmt.Errorf("GetPath context cancelled")
 		default:
-			return trans.local.Get(name)
+			return trans.local.GetPath(name)
 		}
 	}
 	return trans.remote.GetPath(ctx, host, name)

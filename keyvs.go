@@ -8,6 +8,10 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
+type KeyValueStore interface {
+	GetKey(key []byte) (*KeyValuePair, error)
+}
+
 type kvitemError struct {
 	loc *hexaring.Location
 	kv  *KeyValuePair
@@ -49,7 +53,7 @@ func (kv *Keyvs) RegisterDHT(dht DHT) {
 }
 
 // RegisterTransport registers the remote transport to use.
-func (kv *Keyvs) RegisterTransport(remote KVTransport) {
+func (kv *Keyvs) RegisterTransport(remote KeyValueTransport) {
 	kv.trans.remote = remote
 }
 

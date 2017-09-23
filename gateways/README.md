@@ -31,7 +31,10 @@ This endpoint finds replica locations for a given key.
 This endpoint allows operations directly against the log.  Its use is intended for admin purposes only.
 
 #### /v1/blox
-This endpoint allow operations on the content-addressable storage
+This endpoint allows operations on the content-addressable storage
+
+#### /v1/fs/*{ path }*
+This endpoint allows operations on the file-system
 
 #### /v1/status
 This endpoint returns the status of the node.

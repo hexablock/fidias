@@ -132,7 +132,7 @@ func main() {
 	fidTrans := fidias.NewNetTransport(fsm, index, journal, reapInt, maxIdle, conf.Hexalog.Votes, conf.Hasher())
 	fidias.RegisterFidiasRPCServer(gserver, fidTrans)
 
-	fids := fidias.New(conf, hexlog, rel, fet, keyvs, dev, fidTrans)
+	fids := fidias.New(conf, hexlog, fsm, rel, fet, keyvs, dev, fidTrans)
 
 	// Start serving network requests.  This needs to be started before trying to create or
 	// join the ring as the ring initialization requires the transport

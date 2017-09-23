@@ -34,7 +34,7 @@ func (store *InMemVersionedFileFSM) Get(name string) (*VersionedFile, error) {
 
 func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, store.prefix)
-	ver := NewVersionedFile(key)
+	ver := NewVersionedFile(string(key))
 
 	err := ver.UnmarshalBinary(value)
 	if err != nil {
@@ -42,7 +42,7 @@ func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexatype.Ent
 	}
 
 	store.mu.Lock()
-	store.fs[string(ver.key)] = ver
+	store.fs[ver.name] = ver
 	store.mu.Unlock()
 
 	return nil

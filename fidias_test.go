@@ -17,7 +17,13 @@ import (
 	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
+
+func TestMain(m *testing.M) {
+	log.SetLevel("INFO")
+	os.Exit(m.Run())
+}
 
 type testServer struct {
 	dir    string
@@ -34,6 +40,8 @@ type testServer struct {
 	ps   hexaring.PeerStore
 	r    *hexaring.Ring
 	fids *Fidias
+
+	rdev *RingDevice
 }
 
 func (ts *testServer) start() {
@@ -125,7 +133,8 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
 	RegisterFidiasRPCServer(ts.g, fidTrans)
 
-	ts.fids = New(ts.c, hexlog, rel, fet, keyvs, nil, fidTrans)
+	ts.rdev = NewRingDevice(2, ts.c.Hasher(), ts.btrans)
+	ts.fids = New(ts.c, hexlog, fsm, rel, fet, keyvs, ts.rdev, fidTrans)
 
 	ts.start()
 
@@ -160,6 +169,10 @@ func TestFidias(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-time.After(300 * time.Millisecond)
+
+	defer ts1.cleanup()
+	defer ts2.cleanup()
+	defer ts3.cleanup()
 
 	//
 	// Hexalog
@@ -211,6 +224,8 @@ func TestFidias(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-time.After(200 * time.Millisecond)
+
+	defer ts4.cleanup()
 
 	fut, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
 	if err != nil {

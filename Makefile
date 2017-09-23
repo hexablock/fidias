@@ -25,6 +25,9 @@ deps:
 test:
 	go test -cover $(shell go list ./... | grep -v /vendor/)
 
+show-version:
+	@echo $(VERSION)
+
 # Build all
 dist: dist/$(NAME)d-windows.zip
 	for os in linux darwin; do \

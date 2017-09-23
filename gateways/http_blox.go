@@ -33,36 +33,12 @@ import (
 // download faster thanks to gzip).
 //
 
-func (server *HTTPServer) handlerBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
+func (server *HTTPServer) handleBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
 	var err error
 
 	switch r.Method {
 	case http.MethodGet:
 		err = server.handlerBloxGet(w, resourceID)
-		// var id []byte
-		// if id, err = hex.DecodeString(resourceID); err != nil {
-		// 	writeJSONResponse(w, 400, map[string]string{}, nil, err)
-		// 	return
-		// }
-
-		// var (
-		// 	fh *filesystem.BloxFile
-		// )
-
-		// if fh, err = server.fs.Open(id); err != nil {
-		// 	var headers map[string]string
-		// 	if err == block.ErrBlockNotFound {
-		// 		writeJSONResponse(w, 404, headers, nil, err)
-		// 	} else {
-		// 		writeJSONResponse(w, 400, headers, nil, err)
-		// 	}
-		// 	return
-		// }
-		// w.Header().Set("Content-Length", fmt.Sprintf("%d", fh.Size()))
-		// w.Header().Set(headerBlockSize, fmt.Sprintf("%d", fh.BlockSize()))
-
-		// _, err = io.Copy(w, fh)
-		// fh.Close()
 
 	case http.MethodPost:
 		err = server.handlerBloxPost(w, r)

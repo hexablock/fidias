@@ -16,37 +16,25 @@ var (
 	ErrVersionExists   = errors.New("version exists")
 )
 
-// FileVersion represents a version of a given key.  It contains the version
-// name and the id it points to
-type FileVersion struct {
-	// Version alias
-	Alias string
-	// Hash ID
-	ID []byte
-}
-
-func (ver *FileVersion) String() string {
+// Text returns the text string representation of the file version
+func (ver *FileVersion) Text() string {
 	return hex.EncodeToString(ver.ID) + " " + ver.Alias
 }
 
 type VersionedFile struct {
-	key      []byte
+	// Name i.e. full path of the file
+	name string
+	// Alias to version hash map
 	versions map[string]*FileVersion
 	// Entry associate to this view
 	entry *hexatype.Entry
 }
 
-func NewVersionedFile(key []byte) *VersionedFile {
+func NewVersionedFile(name string) *VersionedFile {
 	return &VersionedFile{
-		key:      key,
+		name:     name,
 		versions: make(map[string]*FileVersion),
 	}
-}
-
-// Version returns the active version
-func (f *VersionedFile) Version() *FileVersion {
-	ver, _ := f.versions[activeVersion]
-	return ver
 }
 
 func (f *VersionedFile) UpdateVersion(version *FileVersion) error {
@@ -69,11 +57,25 @@ func (f *VersionedFile) AddVersion(version *FileVersion) error {
 	return ErrVersionExists
 }
 
+// Version returns the active version
+func (f *VersionedFile) Version() *FileVersion {
+	ver, _ := f.versions[activeVersion]
+	return ver
+}
+
+func (f *VersionedFile) GetVersion(alias string) (*FileVersion, error) {
+	if val, ok := f.versions[alias]; ok {
+		return val, nil
+	}
+
+	return nil, ErrVersionNotFound
+}
+
 func (f *VersionedFile) String() string {
 	out := make([]string, len(f.versions))
 	var i int
 	for _, v := range f.versions {
-		out[i] = v.String()
+		out[i] = v.Text()
 		i++
 	}
 	return strings.Join(out, "\n")

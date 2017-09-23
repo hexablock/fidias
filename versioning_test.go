@@ -6,7 +6,7 @@ import (
 )
 
 func TestVersioned(t *testing.T) {
-	vkey := NewVersionedFile([]byte("key"))
+	vkey := NewVersionedFile("key")
 	version := &FileVersion{Alias: "head", ID: []byte("12345678901234567890123456789012")}
 	if err := vkey.AddVersion(version); err != nil {
 		t.Fatal(err)

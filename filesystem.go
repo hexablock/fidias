@@ -14,7 +14,9 @@ var (
 	errFileNotFound = errors.New("file not found")
 )
 
-// INPROGRESS
+type VersionedFileStore interface {
+	GetPath(name string) (*VersionedFile, error)
+}
 
 // FileSystem represents a fidias filesystem
 type FileSystem struct {
@@ -34,28 +36,37 @@ type FileSystem struct {
 
 // NewFileSystem inits a new FileSystem instance.  There can be as many instances needed.
 // namespace is used to prefix all keys.
-func NewFileSystem(host, namespace string, hexlog *Hexalog, bloxfs *filesystem.BloxFS, remote FileSystemTransport) *FileSystem {
+func NewFileSystem(host, namespace string, dev *RingDevice, hexlog *Hexalog, verfs VersionedFileStore) *FileSystem {
 	trans := &localFileSystemTransport{
-		host:   host,
-		remote: remote,
+		host:  host,
+		local: verfs,
 	}
 
-	return &FileSystem{
+	fs := &FileSystem{
 		ns:     []byte(namespace),
 		hexlog: hexlog,
-		bfs:    bloxfs,
-		hasher: bloxfs.Hasher(),
+		bfs:    filesystem.NewBloxFS(dev),
 		trans:  trans,
 	}
+
+	fs.hasher = fs.bfs.Hasher()
+	return fs
 }
 
+// RegisterTransport registers a network transport for the filesystem used to get
+// remote paths
+func (fs *FileSystem) RegisterTransport(remote FileSystemTransport) {
+	fs.trans.remote = remote
+}
+
+// RegisterDHT registers the DHT for lookups
 func (fs *FileSystem) RegisterDHT(dht DHT) {
 	fs.dht = dht
 }
 
 // Create creates a new file
 func (fs *FileSystem) Create(name string) (*File, error) {
-	key := []byte(name)
+	//key := []byte(name)
 	nskey := append(fs.ns, []byte(name)...)
 
 	entry, opts, err := fs.hexlog.NewEntry(nskey)
@@ -68,7 +79,7 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 	}
 
 	// Create the first version being the zero hash
-	vers := NewVersionedFile(key)
+	vers := NewVersionedFile(name)
 	vers.AddVersion(&FileVersion{Alias: activeVersion, ID: fs.hasher.ZeroHash()})
 
 	val, err := vers.MarshalBinary()
@@ -85,15 +96,15 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 	if err = ballot.Wait(); err != nil {
 		return nil, err
 	}
-
 	fent := ballot.Future()
+
 	vers.entry = fent.Entry
 	fh, err := fs.bfs.Create()
 	if err != nil {
 		return nil, err
 	}
 
-	return &File{versions: vers, fh: fh}, nil
+	return &File{versions: vers, BloxFile: fh, hexlog: fs.hexlog}, nil
 }
 
 // Open opens the active version of the named file for reading. If successful,
@@ -123,7 +134,7 @@ func (fs *FileSystem) Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	file := &File{versions: vers, fh: fh}
+	file := &File{versions: vers, BloxFile: fh}
 	return file, nil
 }
 
@@ -150,5 +161,5 @@ func (fs *FileSystem) Stat(name string) (os.FileInfo, error) {
 	}
 	bf := fh.(*filesystem.BloxFile)
 
-	return &File{versions: vers, fh: bf}, nil
+	return &File{versions: vers, BloxFile: bf}, nil
 }
