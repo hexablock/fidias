@@ -9,51 +9,47 @@ import (
 )
 
 func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resourceID string) {
-	var err error
+	var (
+		code    int
+		headers map[string]string
+		data    interface{}
+		err     error
+	)
 
 	switch r.Method {
 	case http.MethodGet:
-		err = server.handlerFSGet(w, resourceID)
+		// We return here if there is no error as the handler has written everything
+		// needed. It fall through to the write below only if there is an error
+		if code, err = server.handlerFSGet(w, resourceID); err == nil {
+			return
+		}
 
 	case http.MethodPost:
-		server.handlerFSPost(w, r, resourceID)
-		return
+		code, headers, data, err = server.handlerFSPost(w, r, resourceID)
 
 	default:
-		w.WriteHeader(405)
-		return
+		code = 405
 	}
 
-	if err == nil {
-		return
-	}
-
-	var (
-		headers map[string]string
-		code    int
-		data    interface{}
-	)
-
+	//if strings.Contains(err.Error(), "host not in set") {
 	// TODO:
-	// if strings.Contains(err.Error(), "host not in set") {
 	// 	code, headers, data, err = buildRedirect(meta.PeerSet, r.URL.RequestURI())
-	// }
+	//}
 
 	writeJSONResponse(w, code, headers, data, err)
 }
 
-func (server *HTTPServer) handlerFSGet(w http.ResponseWriter, resourceID string) error {
+func (server *HTTPServer) handlerFSGet(w http.ResponseWriter, resourceID string) (int, error) {
 	fs := server.fids.FileSystem()
+
+	code := 200
 
 	fh, err := fs.Open(resourceID)
 	if err != nil {
-		var headers map[string]string
 		if err == block.ErrBlockNotFound {
-			writeJSONResponse(w, 404, headers, nil, err)
-		} else {
-			writeJSONResponse(w, 400, headers, nil, err)
+			code = 404
 		}
-		return err
+		return code, err
 	}
 
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", fh.Size()))
@@ -62,30 +58,37 @@ func (server *HTTPServer) handlerFSGet(w http.ResponseWriter, resourceID string)
 	_, err = io.Copy(w, fh)
 	fh.Close()
 
-	return err
+	return code, err
 }
 
-func (server *HTTPServer) handlerFSPost(w http.ResponseWriter, r *http.Request, resourceID string) error {
+func (server *HTTPServer) handlerFSPost(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
 
-	headers := map[string]string{}
 	fs := server.fids.FileSystem()
 
 	fh, err := fs.Create(resourceID)
 	if err != nil {
-		writeJSONResponse(w, 400, headers, nil, err)
-		return err
+
+		if err.Error() == "file exists" {
+			// 304 Not Modified
+			return 304, nil, nil, nil
+		}
+
+		return 400, nil, nil, err
 	}
 
 	_, err = io.Copy(fh, r.Body)
 	defer r.Body.Close()
 
 	if err != nil {
-		writeJSONResponse(w, 400, headers, nil, err)
-		return err
+		return 400, nil, nil, err
 	}
 
 	// Final response after upload completes assuming there are no errors
 	code := 201
+	headers := map[string]string{
+		headerRuntime:   fmt.Sprintf("%v", fh.Runtime()),
+		headerBlockSize: fmt.Sprintf("%d", fh.BlockSize()),
+	}
 
 	if err = fh.Close(); err == block.ErrBlockExists {
 		err = nil
@@ -95,11 +98,5 @@ func (server *HTTPServer) handlerFSPost(w http.ResponseWriter, r *http.Request, 
 		code = 226
 	}
 
-	data := fh.Sys()
-	rt := fh.Runtime()
-	headers[headerRuntime] = fmt.Sprintf("%v", rt)
-	headers[headerBlockSize] = fmt.Sprintf("%d", fh.BlockSize())
-	writeJSONResponse(w, code, headers, data, err)
-
-	return err
+	return code, headers, fh.Sys(), err
 }

@@ -61,6 +61,9 @@ func parseIntQueryParam(r *http.Request, param string) (int, error) {
 // finally the data.  It manages serializing the data.  It data is a byte slice then it simply
 // writes the data without setting any content type headers
 func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]string, data interface{}, err error) {
+
+	w.Header().Set("Content-Type", "application/json")
+
 	var (
 		b []byte
 		c = code
@@ -81,15 +84,17 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 				b = t
 			} else {
 				b, _ = json.Marshal(data)
-				w.Header().Set("Content-Type", "application/json")
+				//w.Header().Set("Content-Type", "application/json")
 			}
 		}
 
 	}
 
 	// Set headers supplied as input
-	for k, v := range headers {
-		w.Header().Set(k, v)
+	if headers != nil {
+		for k, v := range headers {
+			w.Header().Set(k, v)
+		}
 	}
 
 	// Set ACL headers after so they are not overwritten by the caller
