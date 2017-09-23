@@ -16,7 +16,8 @@ func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resou
 		err = server.handlerFSGet(w, resourceID)
 
 	case http.MethodPost:
-		err = server.handlerFSPost(w, r, resourceID)
+		server.handlerFSPost(w, r, resourceID)
+		return
 
 	default:
 		w.WriteHeader(405)
