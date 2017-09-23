@@ -25,20 +25,3 @@ if [ "${#@}" -eq 1 ]; then
 elif [ "${#@}" -eq 2 ]; then
   op="w"
 fi
-
-#key="${1:-fidiaskey}"
-# Number of keys to read
-#count="${2:-10}"
-
-
-#if [[ "$key" =~ ^[0-9]+$ ]]; then
-#  count=$key
-#  key="fidiaskey"
-#fi
-
-# cat <<EOF
-
-#   Gateway    : $host
-#   Key Prefix : $key
-
-# EOF
