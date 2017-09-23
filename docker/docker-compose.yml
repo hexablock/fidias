@@ -7,6 +7,7 @@ services:
       - "7700:7700"
     environment:
       FIDS_ADV_ADDR: "bootstrap:32100"
+      FIDS_BLOX_ADV_ADDR: "bootstrap:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7700"
 
   peer1:
@@ -16,6 +17,7 @@ services:
       - "7701:7700"
     environment:
       FIDS_ADV_ADDR: "peer1:32100"
+      FIDS_BLOX_ADV_ADDR: "peer1:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7701"
 
   peer2:
@@ -25,6 +27,7 @@ services:
       - "7702:7700"
     environment:
       FIDS_ADV_ADDR: "peer2:32100"
+      FIDS_BLOX_ADV_ADDR: "peer2:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7702"
 
   peer3:
@@ -34,6 +37,7 @@ services:
       - "7703:7700"
     environment:
       FIDS_ADV_ADDR: peer3:32100
+      FIDS_BLOX_ADV_ADDR: "peer3:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7703"
 
   peer4:
@@ -43,6 +47,7 @@ services:
       - "7704:7700"
     environment:
       FIDS_ADV_ADDR: peer4:32100
+      FIDS_BLOX_ADV_ADDR: "peer4:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7704"
 
   peer5:
@@ -52,6 +57,7 @@ services:
       - "7705:7700"
     environment:
       FIDS_ADV_ADDR: peer5:32100
+      FIDS_BLOX_ADV_ADDR: "peer5:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7705"
 
   peer6:
@@ -61,4 +67,5 @@ services:
       - "7706:7700"
     environment:
       FIDS_ADV_ADDR: peer6:32100
+      FIDS_BLOX_ADV_ADDR: "peer6:42100"
       FIDS_HTTP_ADV_ADDR: "127.0.0.1:7706"
