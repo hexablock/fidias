@@ -34,6 +34,7 @@ func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resou
 		data    interface{}
 	)
 
+	// TODO:
 	// if strings.Contains(err.Error(), "host not in set") {
 	// 	code, headers, data, err = buildRedirect(meta.PeerSet, r.URL.RequestURI())
 	// }
