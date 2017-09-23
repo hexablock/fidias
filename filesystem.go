@@ -14,6 +14,8 @@ var (
 	errFileNotFound = errors.New("file not found")
 )
 
+// VersionedFileStore implements a storage mechanism for versioned file paths.
+// Each file path may point many versions containing an alias and id
 type VersionedFileStore interface {
 	GetPath(name string) (*VersionedFile, error)
 }
@@ -66,7 +68,6 @@ func (fs *FileSystem) RegisterDHT(dht DHT) {
 
 // Create creates a new file
 func (fs *FileSystem) Create(name string) (*File, error) {
-	//key := []byte(name)
 	nskey := append(fs.ns, []byte(name)...)
 
 	entry, opts, err := fs.hexlog.NewEntry(nskey)

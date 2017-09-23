@@ -58,25 +58,6 @@ func TestRingDevice(t *testing.T) {
 
 	defer fh.Close()
 
-	// n := (1024 * 1024) + 2048
-	// b := make([]byte, n)
-	// rn, err := fh.Read(b)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// if rn != n {
-	// 	t.Error("did not read all")
-	// }
-
-	// rn, err = nf.Write(b)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// if rn != n {
-	// 	t.Error("did not write all")
-	// }
-
 	//
 	if _, err = io.Copy(nf, fh); err != nil {
 		t.Fatal(err)

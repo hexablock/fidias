@@ -109,13 +109,8 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 }
 
 func buildRedirect(locs hexaring.LocationSet, reqPath string) (code int, headers map[string]string, data interface{}, err error) {
-	headers = make(map[string]string)
 
-	// simply return out error
-	// if !strings.Contains(e.Error(), "host not in set") {
-	// 	err = e
-	// 	return
-	// }
+	headers = make(map[string]string)
 
 	loc := locs[0]
 	meta := loc.Vnode.Metadata()

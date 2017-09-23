@@ -82,7 +82,6 @@ func setupStores(conf *fidias.Config, baseDir string) (index store.IndexStore, e
 	}
 	entries = ents
 
-	//fsm = fidias.NewBadgerKeyValueFSM(fdir)
 	stable = store.NewBadgerStableStore(sdir)
 
 	return

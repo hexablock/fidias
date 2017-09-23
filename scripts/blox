@@ -1,0 +1,25 @@
+#!/bin/bash
+
+
+source $(dirname $0)/common.sh
+
+USAGE=$(cat <<EOF
+
+  Usage: $0 [ write | read ] <path-id>
+  
+EOF)
+
+if [ "${#@}" -ne 2 ]; then
+  echo -e "${USAGE}"
+  exit 2;
+fi 
+
+case $key in
+  write)
+    curl -v ${host}/${p_blox} --data-binary @"${value}"
+    ;;
+  read)
+    curl -v -O ${host}/${p_blox}/"${value}"
+    ;;
+esac
+

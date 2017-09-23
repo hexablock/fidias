@@ -8,6 +8,8 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
+// File is a fidias file representing a standard OS file type interface.
+// It contains methods to perform native go file type operations
 type File struct {
 	*filesystem.BloxFile
 
@@ -15,18 +17,13 @@ type File struct {
 	hexlog   *Hexalog
 }
 
+// Name returns the absolute path name of the file
 func (file *File) Name() string {
 	return file.versions.name
 }
 
-// func (file *File) Size() int64 {
-// 	return file.fh.Size()
-// }
-
-// func (file *File) Sys() interface{} {
-// 	return file.versions
-// }
-
+// Close closes the underlying BloxFile and updates hexalog with the new
+// hash entries
 func (file *File) Close() error {
 	err := file.BloxFile.Close()
 	if err != nil {
@@ -66,7 +63,9 @@ func (file *File) Close() error {
 	}
 	err = ballot.Wait()
 
-	// TODO: May need to wait for the future here
+	// TODO:
+	// May need to wait for the future here
+	// Reload in memory object
 
 	return err
 }

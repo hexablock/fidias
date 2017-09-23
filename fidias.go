@@ -59,9 +59,6 @@ func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher 
 		shutdown:  make(chan struct{}, 1), // For relocator
 	}
 
-	//bloxfs := filesystem.NewBloxFS(fidias.dev)
-	//fids.fs = NewFileSystem(conf.Hostname(), conf.FileSystemNamespace, hexlog, bloxfs, fsm)
-
 	// Register hexalog network transport to fetcher
 	fids.fet.RegisterTransport(hexlog.trans.remote)
 
@@ -92,6 +89,7 @@ func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher 
 	return fids
 }
 
+// FileSystem returns the fidias file-system
 func (fidias *Fidias) FileSystem() *FileSystem {
 	return fidias.fs
 }
@@ -113,7 +111,7 @@ func (fidias *Fidias) Register(ring *hexaring.Ring) {
 		fidias.dev.RegisterDHT(ring)
 		fidias.fs.RegisterDHT(ring)
 
-		log.Printf("[INFO] File system initialized")
+		log.Printf("[INFO] FileSystem initialization complete")
 	}
 	// Register dht to fetcher
 	fidias.fet.RegisterDHT(ring)

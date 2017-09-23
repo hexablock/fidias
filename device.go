@@ -9,13 +9,6 @@ import (
 	"github.com/hexablock/log"
 )
 
-// Locator implements an interface to perform lookups against the cluster
-// type Locator interface {
-// 	LookupReplicatedHash(id []byte, n int) (hexaring.LocationSet, error)
-// 	LookupReplicated(key []byte, n int) (hexaring.LocationSet, error)
-// 	ScourReplicatedKey(key []byte, r int, cb func(*chord.Vnode) error) (int, error)
-// }
-//
 var errBloxAddrMissing = errors.New("blox address missing")
 
 // RingDevice implements the blox.BlockDevice interface backed by hexaring to distribute
