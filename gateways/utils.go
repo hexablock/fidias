@@ -18,10 +18,11 @@ const (
 	// headerBallotTime is the header key for the time taken for a ballot
 	headerBallotTime = "Ballot-Time"
 	// headerLocateTime is the header key for the time taken for a locate call
-	headerLocateTime = "Locate-Time"
-	headerLookupTime = "Lookup-Time"
-	headerBlockSize  = "Block-Size"
-	headerRuntime    = "Runtime"
+	headerLocateTime     = "Locate-Time"
+	headerLookupTime     = "Lookup-Time"
+	headerBlockSize      = "Block-Size"
+	headerBlockWriteTime = "Block-Write-Time"
+	headerRuntime        = "Runtime"
 )
 
 // statusCodeRedirect will keep the data for the call

@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,8 +13,11 @@ import (
 const activeVersion = "active"
 
 var (
+	// ErrVersionNotFound is used when a file version is not found
 	ErrVersionNotFound = errors.New("version not found")
-	ErrVersionExists   = errors.New("version exists")
+	// ErrVersionExists is used when a new version being created has
+	// the same name as an already existing one
+	ErrVersionExists = errors.New("version exists")
 )
 
 // Text returns the text string representation of the file version
@@ -21,8 +25,21 @@ func (ver *FileVersion) Text() string {
 	return hex.EncodeToString(ver.ID) + " " + ver.Alias
 }
 
+// MarshalJSON marshals a file version accounting for hash ids
+func (ver *FileVersion) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Alias string
+		ID    string
+	}{
+		Alias: ver.Alias,
+		ID:    hex.EncodeToString(ver.ID),
+	})
+}
+
+// VersionedFile contains all known versions for a given file and the hexalog
+// entry associated with the view instance
 type VersionedFile struct {
-	// Name i.e. full path of the file
+	// Full path of the file
 	name string
 	// Alias to version hash map
 	versions map[string]*FileVersion
@@ -30,6 +47,7 @@ type VersionedFile struct {
 	entry *hexatype.Entry
 }
 
+// NewVersionedFile instantiates a new VersionedFile with the given name
 func NewVersionedFile(name string) *VersionedFile {
 	return &VersionedFile{
 		name:     name,
@@ -37,17 +55,21 @@ func NewVersionedFile(name string) *VersionedFile {
 	}
 }
 
-func (f *VersionedFile) UpdateVersion(version *FileVersion) error {
+// UpdateVersion updates a version by the alias. It returns an
+// ErrVersionNotFound if the alias is not found,
+func (f *VersionedFile) UpdateVersion(alias string, id []byte) error {
 
-	if ver, ok := f.versions[version.Alias]; ok {
-		f.versions[version.Alias] = ver
+	if ver, ok := f.versions[alias]; ok {
+		ver.ID = id
+		f.versions[alias] = ver
 		return nil
 	}
 
 	return ErrVersionNotFound
 }
 
-// AddVersion adds a new version
+// AddVersion adds a new version of the file.  It returns an ErrVersionExists
+// if the alias for the given version already exists.
 func (f *VersionedFile) AddVersion(version *FileVersion) error {
 	if _, ok := f.versions[version.Alias]; !ok {
 		f.versions[version.Alias] = version
@@ -63,6 +85,7 @@ func (f *VersionedFile) Version() *FileVersion {
 	return ver
 }
 
+// GetVersion gets a version by the given alias.
 func (f *VersionedFile) GetVersion(alias string) (*FileVersion, error) {
 	if val, ok := f.versions[alias]; ok {
 		return val, nil
@@ -79,6 +102,15 @@ func (f *VersionedFile) String() string {
 		i++
 	}
 	return strings.Join(out, "\n")
+}
+
+// MarshalJSON marshals the VersionedFile as json with the wanted private
+// fields
+func (f *VersionedFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Name     string
+		Versions map[string]*FileVersion
+	}{f.name, f.versions})
 }
 
 // MarshalBinary marshals the version into a byte slice.  It does not include

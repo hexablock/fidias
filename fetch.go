@@ -200,7 +200,7 @@ func (fet *Fetcher) fetchBlocks() {
 		}
 
 		// Set the block locally
-		if _, err = fet.blks.SetBlock(local, blk); err != nil {
+		if _, err = fet.blks.SetBlock(local, blk); err != nil && err != block.ErrBlockExists {
 			log.Printf("[ERROR] Fetcher failed set block id=%x error='%v'", id, err)
 		}
 	}

@@ -72,8 +72,14 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 	// block id's across
 	go func() {
 		n, rt, err := reb.relocateBlocks(local, newPred)
-		log.Printf("[INFO] Relocated blocks=%d src=%s/%x dst=%s/%x runtime=%v error='%v'",
-			n, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt, err)
+		if err != nil {
+			log.Printf("[ERROR] Relocate blocks failed src=%s/%x dst=%s/%x error='%v'",
+				local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], err)
+		} else if n > 0 {
+			log.Printf("[INFO] Relocated blocks=%d src=%s/%x dst=%s/%x runtime=%v",
+				n, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt)
+		}
+
 	}()
 
 	return n, rt, err

@@ -17,7 +17,7 @@ func TestVersioned(t *testing.T) {
 	}
 
 	version.ID = []byte("qplaplapla")
-	if err := vkey.UpdateVersion(version); err != nil {
+	if err := vkey.UpdateVersion(version.Alias, version.ID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -26,7 +26,7 @@ func TestVersioned(t *testing.T) {
 	}
 
 	v2 := &FileVersion{Alias: "name", ID: []byte("123456765434567654456765y")}
-	if err := vkey.UpdateVersion(v2); err != ErrVersionNotFound {
+	if err := vkey.UpdateVersion("name", v2.ID); err != ErrVersionNotFound {
 		t.Fatal("should fail with", ErrVersionNotFound, err)
 	}
 	vkey.AddVersion(v2)

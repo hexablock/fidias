@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/hexablock/blox/block"
 )
 
 func TestFileSystem(t *testing.T) {
@@ -76,6 +78,70 @@ func TestFileSystem(t *testing.T) {
 	tfile.Close()
 	if err = rfh.Close(); err != nil {
 		t.Error(err)
+	}
+
+	if err = ts1.fids.fs.Mkdir("user"); err != nil {
+		t.Fatal(err)
+	}
+
+	fh, err := ts1.fids.fs.Create("user/foobar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fh.Write([]byte("foofdfdlkfdflkdjfldkjfldkjfdl")); err != nil {
+		t.Fatal(err)
+	}
+	if err = fh.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	dir, err := ts1.fids.fs.Open("user")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !dir.IsDir() {
+		t.Fatal("should be directory")
+	}
+
+	if err = ts1.fids.fs.Mkdir("fuber/uber"); err == nil {
+		t.Fatal("should fail with='file not found' got='nil'")
+	}
+
+	if err = ts1.fids.fs.Mkdir("user/uber"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = ts1.fids.fs.Open("user/uber"); err == nil {
+		t.Fatal("should fail to open new dir")
+	}
+
+	d1, err := ts1.fids.fs.Open("user")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !d1.IsDir() {
+		t.Fatal("should be directory")
+	}
+
+	tb := d1.Sys().(*block.TreeBlock)
+	var c int
+	tb.Iter(func(tn *block.TreeNode) error {
+		c++
+		return nil
+	})
+	if c != 2 {
+		t.Fatal("should have 2 tree nodes")
+	}
+
+	ls, err := d1.Readdirnames(0)
+	if err != nil {
+		t.Fatal("failed to list files in dir", err)
+	}
+
+	if len(ls) != 2 {
+		t.Fatal("should have 2 files got", len(ls))
 	}
 
 	ts1.fids.shutdownWait()

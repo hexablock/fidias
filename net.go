@@ -105,8 +105,8 @@ func (trans *NetTransport) GetPath(ctx context.Context, host string, name string
 	if err != nil {
 		return nil, hexatype.ParseGRPCError(err)
 	}
-
-	verf := NewVersionedFile(resp.Name)
+	// New from remote, though we may have one locally as well
+	verf := NewVersionedFile(name)
 	verf.entry = resp.Entry
 	for _, ver := range resp.Versions {
 		if err = verf.AddVersion(ver); err != nil {
@@ -124,20 +124,25 @@ func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*Ke
 
 // GetPathRPC serves a GetPath request
 func (trans *NetTransport) GetPathRPC(ctx context.Context, in *PathRPC) (*PathRPC, error) {
-	verfile, err := trans.local.GetPath(in.Name)
-
+	// We don't send the name for efficiency i.e resp.Name = verfile.name, as the
+	// requestor already knows the name and can populate it there rather than
+	// server sending it again over the wire
 	resp := &PathRPC{}
-	if err == nil {
-		resp.Entry = verfile.entry
-		resp.Versions = make([]*FileVersion, len(verfile.versions))
-		var i int
-		for _, ver := range verfile.versions {
-			resp.Versions[i] = ver
-			i++
-		}
+
+	verfile, err := trans.local.GetPath(in.Name)
+	if err != nil {
+		return resp, err
 	}
 
-	return resp, err
+	resp.Entry = verfile.entry
+	resp.Versions = make([]*FileVersion, len(verfile.versions))
+	var i int
+	for _, ver := range verfile.versions {
+		resp.Versions[i] = ver
+		i++
+	}
+
+	return resp, nil
 }
 
 // GetRelocateStream gets a stream to send relocation keys

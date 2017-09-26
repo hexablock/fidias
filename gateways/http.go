@@ -2,6 +2,7 @@ package gateways
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -56,7 +57,8 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, k
 
 func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := strings.TrimPrefix(r.URL.Path, server.prefix)
-	reqpath = strings.TrimPrefix(reqpath, "/")
+	reqpath = strings.TrimPrefix(reqpath, "/") // remove leading
+	reqpath = strings.TrimSuffix(reqpath, "/") // remove trailing
 
 	// Blox handler.  This is dealt with here as it has a different handler
 	// definition then the rest
@@ -76,6 +78,7 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	code, headers, data, err := handler(w, r, resourceID)
 	writeJSONResponse(w, code, headers, data, err)
+	log.Printf("[INFO] %d %s %s", code, r.Method, r.RequestURI)
 }
 
 func (server *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {

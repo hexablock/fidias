@@ -27,7 +27,6 @@ func (store *InMemVersionedFileFSM) Get(name string) (*VersionedFile, error) {
 		store.mu.RUnlock()
 		return nil, errFileNotFound
 	}
-
 	store.mu.RUnlock()
 	return ver, nil
 }
@@ -35,7 +34,7 @@ func (store *InMemVersionedFileFSM) Get(name string) (*VersionedFile, error) {
 func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, store.prefix)
 	ver := NewVersionedFile(string(key))
-
+	ver.entry = entry
 	err := ver.UnmarshalBinary(value)
 	if err != nil {
 		return err

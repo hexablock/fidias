@@ -22,6 +22,7 @@ import (
 
 func TestMain(m *testing.M) {
 	log.SetLevel("INFO")
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	os.Exit(m.Run())
 }
 

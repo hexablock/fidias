@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/hexablock/blox/block"
+	"github.com/hexablock/fidias"
 )
 
 func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resourceID string) {
@@ -18,14 +19,22 @@ func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resou
 
 	switch r.Method {
 	case http.MethodGet:
-		// We return here if there is no error as the handler has written everything
-		// needed. It fall through to the write below only if there is an error
-		if code, err = server.handlerFSGet(w, resourceID); err == nil {
-			return
+		q := r.URL.Query()
+
+		if _, ok := q["stat"]; ok {
+			code, data, err = server.handleFSStat(w, resourceID)
+		} else if _, ok := q["versions"]; ok {
+			code, headers, data, err = server.handleFSVersions(w, r, resourceID)
+		} else {
+			// We return here if there is no error as the handler has written everything
+			// needed. It fall through to the write below only if there is an error
+			if code, err = server.handleFSGet(w, resourceID); err == nil {
+				return
+			}
 		}
 
 	case http.MethodPost:
-		code, headers, data, err = server.handlerFSPost(w, r, resourceID)
+		code, headers, data, err = server.handleFSPost(w, r, resourceID)
 
 	default:
 		code = 405
@@ -39,7 +48,7 @@ func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resou
 	writeJSONResponse(w, code, headers, data, err)
 }
 
-func (server *HTTPServer) handlerFSGet(w http.ResponseWriter, resourceID string) (int, error) {
+func (server *HTTPServer) handleFSGet(w http.ResponseWriter, resourceID string) (int, error) {
 	fs := server.fids.FileSystem()
 
 	code := 200
@@ -61,7 +70,49 @@ func (server *HTTPServer) handlerFSGet(w http.ResponseWriter, resourceID string)
 	return code, err
 }
 
-func (server *HTTPServer) handlerFSPost(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
+func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string) (int, interface{}, error) {
+	fs := server.fids.FileSystem()
+
+	code := 200
+
+	fh, err := fs.Stat(resourceID)
+	if err != nil {
+		if err == block.ErrBlockNotFound {
+			code = 404
+		}
+		return code, nil, err
+	}
+
+	blk := fh.Sys()
+	var data interface{}
+	if fh.IsDir() {
+		data = blk.(*block.TreeBlock)
+	} else {
+		data = blk.(*block.IndexBlock)
+	}
+	return code, data, nil
+}
+
+func (server *HTTPServer) handleFSVersions(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
+
+	fs := server.fids.FileSystem()
+
+	code := 200
+
+	stat, err := fs.Stat(resourceID)
+	if err != nil {
+		if err == block.ErrBlockNotFound {
+			code = 404
+		}
+		return code, nil, nil, err
+	}
+
+	fh := stat.(*fidias.File)
+	data := fh.Versions()
+	return code, nil, data, nil
+}
+
+func (server *HTTPServer) handleFSPost(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
 
 	fs := server.fids.FileSystem()
 
@@ -86,8 +137,8 @@ func (server *HTTPServer) handlerFSPost(w http.ResponseWriter, r *http.Request, 
 	// Final response after upload completes assuming there are no errors
 	code := 201
 	headers := map[string]string{
-		headerRuntime:   fmt.Sprintf("%v", fh.Runtime()),
-		headerBlockSize: fmt.Sprintf("%d", fh.BlockSize()),
+		headerBlockWriteTime: fmt.Sprintf("%v", fh.Runtime()),
+		headerBlockSize:      fmt.Sprintf("%d", fh.BlockSize()),
 	}
 
 	if err = fh.Close(); err == block.ErrBlockExists {
