@@ -6,7 +6,7 @@ import (
 
 	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
-	"github.com/hexablock/hexalog/store"
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -31,7 +31,7 @@ type Relocator struct {
 	replicas int64
 	hasher   hexatype.Hasher
 	// Keylog index
-	idx store.IndexStore
+	idx hexalog.IndexStore
 	// Block index
 	blkj device.Journal
 	// RPC transport
@@ -61,7 +61,7 @@ func (reb *Relocator) RegisterBlockJournal(journal device.Journal) {
 
 // RegisterKeylogIndex register an index store of keylogs  to the relocator to be used to
 // determine the keys that need to be relocated
-func (reb *Relocator) RegisterKeylogIndex(idx store.IndexStore) {
+func (reb *Relocator) RegisterKeylogIndex(idx hexalog.IndexStore) {
 	reb.idx = idx
 }
 
@@ -94,7 +94,7 @@ func (reb *Relocator) relocateKeylogs(local, newPred *chord.Vnode) (n int, rt ti
 	start := time.Now()
 	out := make([]*KeyLocation, 0)
 	// This obtains a read lock.
-	reb.idx.Iter(func(key []byte, idx store.KeylogIndex) error {
+	reb.idx.Iter(func(key []byte, idx hexatype.KeylogIndex) error {
 		// get replica hashes for a key including natural hash
 		hashes := hexaring.BuildReplicaHashes(key, reb.replicas, reb.hasher.New())
 		// Get location id for key based on local vnode

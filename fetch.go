@@ -7,7 +7,6 @@ import (
 	"github.com/hexablock/blox/block"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -25,8 +24,8 @@ type Fetcher struct {
 	// Used specifically to submit heal request
 	heal Healer
 	// Hexalog stores
-	idx     store.IndexStore
-	entries store.EntryStore
+	idx     hexalog.IndexStore
+	entries hexalog.EntryStore
 
 	// block device transport to handle local and remote
 	blks blox.Transport
@@ -43,7 +42,7 @@ type Fetcher struct {
 	stopped chan struct{}
 }
 
-func NewFetcher(idx store.IndexStore, ent store.EntryStore, replicas, bufSize int, hasher hexatype.Hasher) *Fetcher {
+func NewFetcher(idx hexalog.IndexStore, ent hexalog.EntryStore, replicas, bufSize int, hasher hexatype.Hasher) *Fetcher {
 	return &Fetcher{
 		idx:      idx,
 		entries:  ent,

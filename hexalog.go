@@ -1,7 +1,6 @@
 package fidias
 
 import (
-	"fmt"
 	"io"
 	"time"
 
@@ -46,9 +45,10 @@ func NewHexalog(conf *Config, logstore *hexalog.LogStore, stable hexalog.StableS
 	remote.Register(hexlog)
 
 	trans := &localHexalogTransport{
-		host:     conf.Hostname(),
-		logstore: logstore,
-		remote:   remote,
+		host:   conf.Hostname(),
+		hexlog: hexlog,
+		store:  logstore,
+		remote: remote,
 	}
 
 	hexl := &Hexalog{
@@ -71,37 +71,26 @@ func (hexlog *Hexalog) MinVotes() int {
 	return hexlog.conf.Votes
 }
 
-func (hexlog *Hexalog) buildOption(key []byte) (*hexatype.RequestOptions, error) {
-	// Lookup locations for this key
-	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
-	if err != nil {
-		return nil, err
-	}
-
-	// Check and set source index
-	opt := &hexatype.RequestOptions{SourceIndex: -1, PeerSet: locs}
-	for i, v := range locs {
-		if v.Host() == hexlog.conf.Hostname {
-			opt.SourceIndex = int32(i)
-			break
-		}
-	}
-
-	// Check we are a member of the set
-	if opt.SourceIndex < 0 {
-		return opt, fmt.Errorf("host not in set: %s", hexlog.conf.Hostname)
-	}
-
-	return opt, nil
-}
-
 // NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
 // the node is not part of the location set or a lookup error occurs
 func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+	// Lookup locations for this key
+	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
+	if err != nil {
+		return nil, nil, err
+	}
+	opt := hexatype.DefaultRequestOptions()
+	opt.PeerSet = locs
+	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
+	// 	return nil, opt, err
+	// }
 
-	opt, err := hexlog.buildOption(key)
-	if err == nil {
-		return hexlog.hexlog.New(key), opt, nil
+	var entry *hexatype.Entry
+	for i, loc := range locs {
+		if entry, err = hexlog.trans.NewEntry(loc.Host(), key); err == nil {
+			opt.SourceIndex = int32(i)
+			return entry, opt, nil
+		}
 	}
 
 	return nil, opt, err
@@ -112,10 +101,17 @@ func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestO
 // the new entry.  This is essentially a compare and set
 func (hexlog *Hexalog) NewEntryFrom(entry *hexatype.Entry) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 
-	opt, err := hexlog.buildOption(entry.Key)
+	// Lookup locations for this key
+	locs, err := hexlog.dht.LookupReplicated(entry.Key, hexlog.MinVotes())
 	if err != nil {
-		return nil, opt, err
+		return nil, nil, err
 	}
+	opt := hexatype.DefaultRequestOptions()
+	opt.PeerSet = locs
+	//opt := &hexatype.RequestOptions{SourceIndex: 0, PeerSet: locs}
+	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
+	// 	return nil, opt, err
+	// }
 
 	nentry := &hexatype.Entry{
 		Key:       entry.Key,
@@ -130,7 +126,8 @@ func (hexlog *Hexalog) NewEntryFrom(entry *hexatype.Entry) (*hexatype.Entry, *he
 // ProposeEntry finds locations for the entry and proposes it to those locations.  It retries
 // the specified number of times before returning.  It returns a ballot that can be waited on
 // for the entry to be applied or an error
-func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (ballot *hexalog.Ballot, err error) {
+func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (err error) {
+
 	retries := int(opts.Retries)
 	if retries < 1 {
 		retries = 1
@@ -138,7 +135,8 @@ func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.Reques
 
 	for i := 0; i < retries; i++ {
 		// Propose with retries.  Retry only on a ErrPreviousHash error
-		if ballot, err = hexlog.hexlog.Propose(entry, opts); err == nil {
+		//if ballot, err = hexlog.hexlog.Propose(entry, opts); err == nil {
+		if err = hexlog.trans.ProposeEntry(opts.PeerSet[0].Host(), entry, opts); err == nil {
 			return
 		} else if err == hexatype.ErrPreviousHash {
 			time.Sleep(hexlog.retryInt)

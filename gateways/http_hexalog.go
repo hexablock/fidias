@@ -3,6 +3,7 @@ package gateways
 import (
 	"encoding/hex"
 	"net/http"
+	"strings"
 
 	"github.com/hexablock/hexatype"
 )
@@ -18,13 +19,17 @@ func (server *HTTPServer) handleHexalog(w http.ResponseWriter, r *http.Request, 
 
 	switch r.Method {
 	case http.MethodGet:
-		//keid := strings.Split(resourceID, "/")
-
-		//if len(keid) == 2 {
-		//	code, data, err = server.handleGetEntry([]byte(keid[0]), keid[1])
-		//} else {
+		keid := strings.Split(resourceID, "/")
+		// Handle entry get
+		id, er := hex.DecodeString(keid[len(keid)-1])
+		if er == nil {
+			k := keid[len(keid)-2]
+			code = 200
+			data, err = server.logstore.GetEntry([]byte(k), id)
+			return
+		}
+		// Handle log index get
 		code, data, err = server.handleGetKeylog([]byte(resourceID))
-		//}
 
 	default:
 		code = 405

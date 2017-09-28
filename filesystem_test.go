@@ -112,8 +112,8 @@ func TestFileSystem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = ts1.fids.fs.Open("user/uber"); err == nil {
-		t.Fatal("should fail to open new dir")
+	if _, err = ts1.fids.fs.Open("user/uber"); err != nil {
+		t.Fatal(err)
 	}
 
 	d1, err := ts1.fids.fs.Open("user")

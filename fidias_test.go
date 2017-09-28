@@ -189,26 +189,29 @@ func TestFidias(t *testing.T) {
 		t.Fatal(err)
 	}
 	//&hexatype.RequestOptions{PeerSet: remeta.PeerSet}
-	ballot, err := ts3.fids.hexlog.ProposeEntry(entry, opt)
+	opt.WaitBallot = true
+	opt.WaitApply = true
+	opt.WaitApplyTimeout = 1000
+	err = ts1.fids.hexlog.ProposeEntry(entry, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = ballot.Wait(); err != nil {
-		t.Fatal(err)
-	}
+	// if err = ballot.Wait(); err != nil {
+	// 	t.Fatal(err)
+	// }
 
-	fe := ballot.Future()
-	if _, err = fe.Wait(1 * time.Second); err != nil {
-		t.Fatal(err)
-	}
+	// fe := ballot.Future()
+	// if _, err = fe.Wait(1 * time.Second); err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	id := entry.Hash(ts2.c.Hasher().New())
 	if _, _, err = ts2.fids.hexlog.GetEntry(entry.Key, id); err != nil {
 		t.Fatal(err)
 	}
 
-	ki, err := ts3.fids.hexlog.trans.logstore.GetKey(entry.Key)
+	ki, err := ts3.fids.hexlog.trans.store.GetKey(entry.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +231,7 @@ func TestFidias(t *testing.T) {
 
 	defer ts4.cleanup()
 
-	fut, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
+	_, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,9 +239,9 @@ func TestFidias(t *testing.T) {
 		t.Fatal("should have 3 peers")
 	}
 
-	if _, err = fut.Wait(2 * time.Second); err != nil {
-		t.Fatal(err)
-	}
+	// if _, err = fut.Wait(2 * time.Second); err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	//
 	// Keyvs

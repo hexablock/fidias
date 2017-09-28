@@ -58,7 +58,6 @@ func NewHTTPServer(apiPrefix string, conf *fidias.Config, ring *hexaring.Ring, k
 func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := strings.TrimPrefix(r.URL.Path, server.prefix)
 	reqpath = strings.TrimPrefix(reqpath, "/") // remove leading
-	reqpath = strings.TrimSuffix(reqpath, "/") // remove trailing
 
 	// Blox handler.  This is dealt with here as it has a different handler
 	// definition then the rest
@@ -70,6 +69,8 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Remove trailing for all remaining handlers
+	reqpath = strings.TrimSuffix(reqpath, "/")
 	handler, resourceID := server.routes.handler(reqpath)
 	if handler == nil {
 		w.WriteHeader(404)

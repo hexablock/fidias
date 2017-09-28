@@ -9,9 +9,15 @@ import (
 
 	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
-	"github.com/hexablock/hexalog/store"
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
+
+// KeyValueStore implements a key value storage interface.  It is used by the
+// network transport
+type KeyValueStore interface {
+	GetKey(key []byte) (*KeyValuePair, error)
+}
 
 // LocalStore implements all local calls needed by the network transport
 type LocalStore interface {
@@ -45,8 +51,8 @@ type RelocateBlocksStream struct {
 type NetTransport struct {
 	local LocalStore
 
-	idxs    store.IndexStore // hexalog index store
-	journal device.Journal   // BlockDevice journal
+	idxs    hexalog.IndexStore // hexalog index store
+	journal device.Journal     // BlockDevice journal
 
 	replicas int
 	hasher   hexatype.Hasher
@@ -60,7 +66,7 @@ type NetTransport struct {
 }
 
 // NewNetTransport instantiates a new network transport using the given key-value store.
-func NewNetTransport(localStore LocalStore, idx store.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
+func NewNetTransport(localStore LocalStore, idx hexalog.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
 	return &NetTransport{
 		local:    localStore,
 		idxs:     idx,

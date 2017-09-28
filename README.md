@@ -88,3 +88,5 @@ The cluster is now running and can be used.  Details on the HTTP API can be foun
 - When using fidias in docker on a Mac with persistent storage, a massive performance hit
 is incurred due to the way docker volumes and persistence are managed by docker on a Mac.
 This is only pertinent for Macs
+
+### References

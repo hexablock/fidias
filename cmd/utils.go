@@ -45,7 +45,7 @@ func setupBlockDevice(basedir string, hasher hexatype.Hasher) (device.Journal, *
 	return journal, dev, nil
 }
 
-func setupStores(conf *fidias.Config, baseDir string) (index store.IndexStore, entries store.EntryStore,
+func setupStores(conf *fidias.Config, baseDir string) (index hexalog.IndexStore, entries hexalog.EntryStore,
 	stable hexalog.StableStore, fsm *fidias.FSM, err error) {
 
 	//if baseDir == "" {

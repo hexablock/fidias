@@ -20,8 +20,9 @@ const (
 	OpFsDel
 )
 
-// FileSystemFSM implements an FSM to manage a versioned file-system.  It is responsible
-// for applying log entries to provide a VersionedFile file-system view.
+// FileSystemFSM implements an FSM to manage a versioned file-system.
+// It is responsible for applying log entries to provide a
+// VersionedFile file-system view.
 type FileSystemFSM interface {
 	// Get a VersionedFile by name
 	Get(name string) (*VersionedFile, error)
@@ -34,8 +35,8 @@ type FileSystemFSM interface {
 	ApplyDelete(entry *hexatype.Entry) error
 }
 
-// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions, it also
-// contains read-only key-value functions needed.
+// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions,
+// it also contains read-only key-value functions needed.
 type KeyValueFSM interface {
 	// Get a key
 	Get(key []byte) (*KeyValuePair, error)
@@ -46,8 +47,8 @@ type KeyValueFSM interface {
 }
 
 // FSM is a hexalog FSM for an in-memory key-value store.  It implements the
-// FSM interface and provides a get function to retrieve keys as all write are handled by
-// the FSM
+// FSM interface and provides a get function to retrieve keys as all write
+// are handled by the FSM
 type FSM struct {
 	kv KeyValueFSM   // FSM for key-value pairs
 	fs FileSystemFSM // FSM for filesystem
@@ -66,7 +67,8 @@ func (fsm *FSM) Open() error {
 	return nil
 }
 
-// GetKey gets a value for the key.  It reads it directly from the stored log entry
+// GetKey gets a value for the key.  It reads it directly from the stored log
+// entry
 func (fsm *FSM) GetKey(key []byte) (*KeyValuePair, error) {
 	return fsm.kv.Get(key)
 }
@@ -76,9 +78,9 @@ func (fsm *FSM) GetPath(name string) (*VersionedFile, error) {
 	return fsm.fs.Get(name)
 }
 
-// Apply applies the given entry to the FSM.  entryID is the hash id of the entry.
-// The first byte in entry.Data contains the operation to be performed followed by the
-// actual value.
+// Apply applies the given entry to the FSM.  entryID is the hash id of the
+// entry.  The first byte in entry.Data contains the operation to be performed
+// followed by the actual value.
 func (fsm *FSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil

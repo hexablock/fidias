@@ -3,14 +3,9 @@ package fidias
 import (
 	"context"
 
-	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 )
-
-type KeyValueStore interface {
-	GetKey(key []byte) (*KeyValuePair, error)
-}
 
 type kvitemError struct {
 	loc *hexaring.Location
@@ -47,7 +42,7 @@ func NewKeyvs(namespace string, hexlog *Hexalog, kvs KeyValueStore) *Keyvs {
 	}
 }
 
-// RegisterRing registers the ring to the keyvalue store
+// RegisterDHT registers the ring to the keyvalue store
 func (kv *Keyvs) RegisterDHT(dht DHT) {
 	kv.dht = dht
 }
@@ -99,37 +94,22 @@ func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOpt
 	return
 }
 
-func (kv *Keyvs) SetKey(basekey, val []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+// SetKey sets a key to the value
+func (kv *Keyvs) SetKey(basekey, val []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 	key := append(kv.ns, basekey...)
 
-	ballot, opt, err := kv.submitLogEntry(key, append([]byte{OpSet}, val...))
-	if err != nil {
-		return nil, opt, err
-	}
-
-	// TODO:
-
-	err = ballot.Wait()
-	fut := ballot.Future()
-	return fut, opt, err
+	return kv.submitLogEntry(key, append([]byte{OpSet}, val...))
 }
 
-func (kv *Keyvs) RemoveKey(basekey []byte) (*hexalog.FutureEntry, *hexatype.RequestOptions, error) {
+// RemoveKey removes a key
+func (kv *Keyvs) RemoveKey(basekey []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 	key := append(kv.ns, basekey...)
 
-	ballot, opt, err := kv.submitLogEntry(key, []byte{OpDel})
-	if err != nil {
-		return nil, opt, err
-	}
-
-	// TODO:
-
-	err = ballot.Wait()
-	fut := ballot.Future()
-	return fut, opt, err
+	return kv.submitLogEntry(key, []byte{OpDel})
 }
 
-func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexalog.Ballot, *hexatype.RequestOptions, error) {
+// generic function for write operations
+func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
 
 	entry, opts, err := kv.hexlog.NewEntry(key)
 	if err != nil {
@@ -137,10 +117,8 @@ func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexalog.Ballot, *hexa
 	}
 	entry.Data = data
 
-	ballot, err := kv.hexlog.ProposeEntry(entry, opts)
-	if err != nil {
-		return nil, opts, err
-	}
+	opts.WaitBallot = true
+	err = kv.hexlog.ProposeEntry(entry, opts)
 
-	return ballot, opts, nil
+	return entry, opts, err
 }

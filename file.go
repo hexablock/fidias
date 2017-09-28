@@ -37,7 +37,8 @@ func (file *File) Versions() *VersionedFile {
 // hash entries
 func (file *File) Close() error {
 	err := file.BloxFile.Close()
-	if err != nil {
+	// Continue to update hexalog if the block exists
+	if err != nil && err != block.ErrBlockExists {
 		return err
 	}
 
@@ -69,11 +70,10 @@ func (file *File) Close() error {
 		return err
 	}
 	entry.Data = append([]byte{OpFsSet}, edata...)
-	ballot, err := file.hexlog.ProposeEntry(entry, opts)
+
+	opts.WaitBallot = true
+	err = file.hexlog.ProposeEntry(entry, opts)
 	if err != nil {
-		return err
-	}
-	if err = ballot.Wait(); err != nil {
 		return err
 	}
 
@@ -105,13 +105,13 @@ func (file *File) Close() error {
 	if err != nil {
 		return err
 	}
-
 	entry.Data = append([]byte{OpFsSet}, edata...)
-	ballot, err = file.hexlog.ProposeEntry(entry, opts)
+
+	opts.WaitBallot = true
+	err = file.hexlog.ProposeEntry(entry, opts)
 	if err != nil {
 		return err
 	}
-	err = ballot.Wait()
 
 	// TODO:
 	// May need to wait for the future here

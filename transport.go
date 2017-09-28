@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"fmt"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -19,22 +20,55 @@ type FileSystemTransport interface {
 }
 
 type localHexalogTransport struct {
-	host     string
-	logstore *hexalog.LogStore
-	remote   *hexalog.NetTransport
+	host   string
+	hexlog *hexalog.Hexalog
+	store  *hexalog.LogStore
+	remote *hexalog.NetTransport
+}
+
+func (trans *localHexalogTransport) NewEntry(host string, key []byte) (*hexatype.Entry, error) {
+	if trans.host == host {
+		return trans.hexlog.New(key), nil
+	}
+	return trans.remote.NewEntry(host, key, &hexatype.RequestOptions{})
+}
+
+func (trans *localHexalogTransport) ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+	if trans.host == host {
+		ballot, err := trans.hexlog.Propose(entry, opts)
+		if err != nil {
+			return err
+		}
+		if !opts.WaitBallot {
+			return nil
+		}
+		if err = ballot.Wait(); err != nil {
+			return err
+		}
+		if opts.WaitApply {
+			fut := ballot.Future()
+			_, err = fut.Wait(time.Duration(opts.WaitApplyTimeout) * time.Millisecond)
+		}
+
+		return err
+	}
+
+	ctx := context.Background()
+	// No remote ballot
+	return trans.remote.ProposeEntry(ctx, host, entry, opts)
 }
 
 // GetEntry gets a local or remote entry based on host
 func (trans *localHexalogTransport) GetEntry(host string, key, id []byte) (*hexatype.Entry, error) {
 	if trans.host == host {
-		return trans.logstore.GetEntry(key, id)
+		return trans.store.GetEntry(key, id)
 	}
 	return trans.remote.GetEntry(host, key, id, &hexatype.RequestOptions{})
 }
 
 func (trans *localHexalogTransport) LastEntry(host string, key []byte) (*hexatype.Entry, error) {
 	if trans.host == host {
-		return trans.logstore.LastEntry(key), nil
+		return trans.store.LastEntry(key), nil
 	}
 	return trans.remote.LastEntry(host, key, &hexatype.RequestOptions{})
 }

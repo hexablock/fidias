@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/hexablock/blox/block"
 	"github.com/hexablock/fidias"
@@ -22,7 +24,7 @@ func (server *HTTPServer) handleFS(w http.ResponseWriter, r *http.Request, resou
 		q := r.URL.Query()
 
 		if _, ok := q["stat"]; ok {
-			code, data, err = server.handleFSStat(w, resourceID)
+			code, headers, data, err = server.handleFSStat(w, resourceID)
 		} else if _, ok := q["versions"]; ok {
 			code, headers, data, err = server.handleFSVersions(w, r, resourceID)
 		} else {
@@ -70,7 +72,10 @@ func (server *HTTPServer) handleFSGet(w http.ResponseWriter, resourceID string) 
 	return code, err
 }
 
-func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string) (int, interface{}, error) {
+func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string) (int, map[string]string, interface{}, error) {
+
+	start := time.Now()
+
 	fs := server.fids.FileSystem()
 
 	code := 200
@@ -80,7 +85,7 @@ func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string)
 		if err == block.ErrBlockNotFound {
 			code = 404
 		}
-		return code, nil, err
+		return code, nil, nil, err
 	}
 
 	blk := fh.Sys()
@@ -90,7 +95,11 @@ func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string)
 	} else {
 		data = blk.(*block.IndexBlock)
 	}
-	return code, data, nil
+
+	rt := time.Since(start)
+	headers := map[string]string{headerRuntime: fmt.Sprintf("%v", rt)}
+
+	return code, headers, data, nil
 }
 
 func (server *HTTPServer) handleFSVersions(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
@@ -116,6 +125,13 @@ func (server *HTTPServer) handleFSPost(w http.ResponseWriter, r *http.Request, r
 
 	fs := server.fids.FileSystem()
 
+	// Make directory
+	if strings.HasSuffix(resourceID, "/") {
+		err := fs.Mkdir(strings.TrimSuffix(resourceID, "/"))
+		return 200, nil, nil, err
+	}
+
+	// Create file
 	fh, err := fs.Create(resourceID)
 	if err != nil {
 

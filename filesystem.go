@@ -9,13 +9,12 @@ import (
 
 	"github.com/hexablock/blox/block"
 	"github.com/hexablock/blox/filesystem"
-	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
 var (
-	errFileExists   = errors.New("file exists")
-	errFileNotFound = errors.New("file not found")
+	errFileExists        = errors.New("file exists")
+	errFileOrDirNotFound = errors.New("file or directory not found")
 )
 
 // VersionedFileStore implements a storage mechanism for versioned file paths.
@@ -78,94 +77,74 @@ func (fs *FileSystem) Mkdir(name string) error {
 	// Get and check directory
 	_, dver, tree, err := fs.getDir(name)
 	if err != nil {
-		return errFileNotFound
+		return err
 	}
 
+	// Namespaced path
 	nskey := append(fs.ns, []byte(name)...)
-
+	// Get entry here for optimization and use these options for later calls
 	entry, opts, err := fs.hexlog.NewEntry(nskey)
 	if err != nil {
 		return err
 	}
 
-	if _, err = fs.trans.GetPath(context.Background(), opts.PeerSet[0].Host(), name); err == nil {
+	// Check if file exists
+	ctx := context.Background()
+	if _, err = fs.trans.GetPath(ctx, opts.PeerSet[0].Host(), name); err == nil {
 		return errFileExists
+	}
+
+	// Create empty tree block
+	ftree := block.NewTreeBlock(nil, fs.hasher)
+	ftree.Hash()
+	if _, err = fs.dev.SetBlock(ftree); err != nil && err != block.ErrBlockExists {
+		return err
 	}
 
 	// Update file entry
 	vers := NewVersionedFile(name)
-	vers.AddVersion(&FileVersion{Alias: activeVersion, ID: fs.hasher.ZeroHash()})
+	vers.AddVersion(&FileVersion{Alias: activeVersion, ID: ftree.ID()})
 	val, err := vers.MarshalBinary()
 	if err != nil {
 		return err
 	}
 	entry.Data = append([]byte{OpFsSet}, val...)
-	if _, err = fs.submitEntry(entry, opts); err != nil {
+
+	opts.WaitBallot = true
+	if err = fs.hexlog.ProposeEntry(entry, opts); err != nil {
 		return err
 	}
 
+	// We're at the root directory; nothing to do
+	if dver == nil {
+		return nil
+	}
+
 	// Update parent directory with current dir info
-	if dver != nil {
-		tn := block.NewDirTreeNode(filepath.Base(name), fs.hasher.ZeroHash())
-		tree.AddNodes(tn)
+	tn := block.NewDirTreeNode(filepath.Base(name), ftree.ID())
+	tree.AddNodes(tn)
 
-		var tid []byte
-		if tid, err = fs.dev.SetBlock(tree); err != nil {
-			return err
-		}
-
-		if err = dver.UpdateVersion(activeVersion, tid); err != nil {
-			return err
-		}
-
-		if entry, opts, err = fs.hexlog.NewEntryFrom(dver.entry); err != nil {
-			return err
-		}
-
-		if val, err = dver.MarshalBinary(); err != nil {
-			return err
-		}
-
-		entry.Data = append([]byte{OpFsSet}, val...)
-		if _, err = fs.submitEntry(entry, opts); err != nil {
-			return err
-		}
-
+	var tid []byte
+	if tid, err = fs.dev.SetBlock(tree); err != nil {
+		return err
 	}
 
-	return err
-}
-
-func (fs *FileSystem) getDir(filename string) (string, *VersionedFile, *block.TreeBlock, error) {
-	name := filepath.Dir(filename)
-	if name == "." {
-		return name, nil, nil, nil
+	if err = dver.UpdateVersion(activeVersion, tid); err != nil {
+		return err
 	}
 
-	nskey := append(fs.ns, []byte(name)...)
-	locs, err := fs.dht.LookupReplicated(nskey, fs.hexlog.MinVotes())
-	if err != nil {
-		return name, nil, nil, err
+	if entry, opts, err = fs.hexlog.NewEntryFrom(dver.entry); err != nil {
+		return err
 	}
 
-	vers, err := fs.trans.GetPath(context.Background(), locs[0].Host(), name)
-	if err != nil {
-		return name, nil, nil, err
+	if val, err = dver.MarshalBinary(); err != nil {
+		return err
 	}
 
-	ver := vers.Version()
-	var tree *block.TreeBlock
-	if bytes.Compare(ver.ID, fs.hasher.ZeroHash()) == 0 {
-		tree = block.NewTreeBlock(nil, fs.hasher)
-	} else {
-		bfh, err := fs.bfs.Open(ver.ID)
-		if err != nil {
-			return name, nil, nil, err
-		}
-		tree = bfh.Sys().(*block.TreeBlock)
-	}
+	entry.Data = append([]byte{OpFsSet}, val...)
+	opts.WaitBallot = true
 
-	return name, vers, tree, err
+	return fs.hexlog.ProposeEntry(entry, opts)
 }
 
 // Create creates a new file
@@ -197,12 +176,13 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 
 	entry.Data = append([]byte{OpFsSet}, val...)
 
-	fent, err := fs.submitEntry(entry, opts)
+	opts.WaitBallot = true
+	err = fs.hexlog.ProposeEntry(entry, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	vers.entry = fent.Entry
+	vers.entry = entry
 	fh, err := fs.bfs.Create()
 	if err != nil {
 		return nil, err
@@ -218,22 +198,8 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 	}, nil
 }
 
-func (fs *FileSystem) submitEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.FutureEntry, error) {
-	ballot, err := fs.hexlog.ProposeEntry(entry, opts)
-	if err != nil {
-		return nil, err
-	}
-	if err = ballot.Wait(); err == nil {
-		return ballot.Future(), nil
-
-	}
-	return nil, err
-}
-
-// Open opens the active version of the named file for reading. If successful,
-// methods on the returned file can be used for reading; the associated file
-// descriptor has mode O_RDONLY.
-func (fs *FileSystem) Open(name string) (*File, error) {
+// GetVersions gets the VersionedFile associated to the provided file name.
+func (fs *FileSystem) GetVersions(name string) (*VersionedFile, error) {
 	key := []byte(name)
 	nskey := append(fs.ns, key...)
 
@@ -242,17 +208,31 @@ func (fs *FileSystem) Open(name string) (*File, error) {
 		return nil, err
 	}
 
+	var (
+		vers *VersionedFile
+		ctx  = context.Background()
+	)
 	//ctx, cancel := context.WithCancel(context.Background())
 	//defer cancel()
-	ctx := context.Background()
+	for _, loc := range locs {
+		if vers, err = fs.trans.GetPath(ctx, loc.Host(), name); err == nil {
+			break
+		}
+	}
 
-	vers, err := fs.trans.GetPath(ctx, locs[0].Host(), name)
+	return vers, err
+}
+
+// Open opens the active version of the named file for reading. If successful,
+// methods on the returned file can be used for reading; the associated file
+// descriptor has mode O_RDONLY.
+func (fs *FileSystem) Open(name string) (*File, error) {
+	vers, err := fs.GetVersions(name)
 	if err != nil {
 		return nil, err
 	}
 
 	active := vers.Version()
-	//log.Printf("ACTIVE %s", active.Text())
 	fh, err := fs.bfs.Open(active.ID)
 	if err != nil {
 		return nil, err
@@ -264,16 +244,7 @@ func (fs *FileSystem) Open(name string) (*File, error) {
 
 // Stat performs a stat call on the file returning a standard os.FileInfo object
 func (fs *FileSystem) Stat(name string) (os.FileInfo, error) {
-	key := []byte(name)
-	locs, err := fs.dht.LookupReplicated(key, fs.hexlog.MinVotes())
-	if err != nil {
-		return nil, err
-	}
-
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
-	ctx := context.Background()
-	vers, err := fs.trans.GetPath(ctx, locs[0].Host(), name)
+	vers, err := fs.GetVersions(name)
 	if err != nil {
 		return nil, err
 	}
@@ -283,6 +254,34 @@ func (fs *FileSystem) Stat(name string) (os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	bf := fh.(*filesystem.BloxFile)
-	return &File{versions: vers, BloxFile: bf}, nil
+
+	return &File{versions: vers, BloxFile: fh.(*filesystem.BloxFile)}, nil
+}
+
+// getDir constructs the directory object for the given filename including the underlying
+// BloxFile
+func (fs *FileSystem) getDir(filename string) (string, *VersionedFile, *block.TreeBlock, error) {
+	name := filepath.Dir(filename)
+	if name == "." {
+		return name, nil, nil, nil
+	}
+
+	vers, err := fs.GetVersions(name)
+	if err != nil {
+		return name, nil, nil, err
+	}
+
+	ver := vers.Version()
+	var tree *block.TreeBlock
+	if bytes.Compare(ver.ID, fs.hasher.ZeroHash()) == 0 {
+		tree = block.NewTreeBlock(nil, fs.hasher)
+	} else {
+		bfh, err := fs.bfs.Open(ver.ID)
+		if err != nil {
+			return name, nil, nil, err
+		}
+		tree = bfh.Sys().(*block.TreeBlock)
+	}
+
+	return name, vers, tree, err
 }
