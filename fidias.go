@@ -74,14 +74,8 @@ func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher 
 	// Register keyvs transport
 	fids.keyvs.RegisterTransport(trans)
 
-	if dev != nil {
-
-		fids.fs = NewFileSystem(conf.Hostname(), conf.FileSystemNamespace,
-			dev, hexlog, fsm)
-		// Register file-system transport
-		fids.fs.RegisterTransport(trans)
-
-	}
+	// Init FS
+	fids.initFileSystem(trans)
 
 	// Set self as the chord delegate
 	conf.Ring.Delegate = fids
@@ -89,36 +83,48 @@ func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher 
 	return fids
 }
 
+func (fids *Fidias) initFileSystem(trans *NetTransport) {
+	if fids.dev == nil {
+		return
+	}
+
+	fids.fs = NewFileSystem(fids.conf.Hostname(), fids.conf.FileSystemNamespace,
+		fids.dev, fids.hexlog, fids.fsm)
+	// Register file-system transport
+	fids.fs.RegisterTransport(trans)
+}
+
 // FileSystem returns the fidias file-system
-func (fidias *Fidias) FileSystem() *FileSystem {
-	return fidias.fs
+func (fids *Fidias) FileSystem() *FileSystem {
+	return fids.fs
 }
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
 // ring depend on each other and the ring may not be intialized yet.  Only upon ring
 // registration, the rebalancing is started.
-func (fidias *Fidias) Register(ring *hexaring.Ring) {
-	fidias.ring = ring
+func (fids *Fidias) Register(ring *hexaring.Ring) {
+	fids.ring = ring
 
 	// Register dht to hexalog
-	fidias.hexlog.RegisterDHT(ring)
+	fids.hexlog.RegisterDHT(ring)
 	// Register dht to key-value
-	fidias.keyvs.RegisterDHT(ring)
+	fids.keyvs.RegisterDHT(ring)
 
 	// Register dht to storage device if enabled.  Only init FS is device is initialized
-	if fidias.dev != nil {
+	if fids.dev != nil {
 
-		fidias.dev.RegisterDHT(ring)
-		fidias.fs.RegisterDHT(ring)
+		fids.dev.RegisterDHT(ring)
+		fids.fs.RegisterDHT(ring)
 
 		log.Printf("[INFO] FileSystem initialization complete")
 	}
+
 	// Register dht to fetcher
-	fidias.fet.RegisterDHT(ring)
+	fids.fet.RegisterDHT(ring)
 
 	log.Println("[INFO] Fidias intializied")
 }
 
-func (fidias *Fidias) shutdownWait() {
-	fidias.fet.stop()
+func (fids *Fidias) shutdownWait() {
+	fids.fet.stop()
 }

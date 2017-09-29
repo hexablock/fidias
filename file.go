@@ -82,7 +82,7 @@ func (file *File) Close() error {
 		return nil
 	}
 
-	// add file TreeNode to dir Tree
+	// Update directory pointer by adding file TreeNode to the dir Tree
 	tn := block.NewFileTreeNode(filepath.Base(file.Name()), ver.ID)
 	file.tree.AddNodes(tn)
 

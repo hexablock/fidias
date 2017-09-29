@@ -156,7 +156,9 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 	}
 
 	nskey := append(fs.ns, []byte(name)...)
-
+	// TODO: REMOVE
+	// Change so nothing is done here, rather on close the tree node is update
+	// We may want to set some marker initially to signify creation
 	entry, opts, err := fs.hexlog.NewEntry(nskey)
 	if err != nil {
 		return nil, err
@@ -166,7 +168,7 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 		return nil, errFileExists
 	}
 
-	// Create the first version being the zero hash
+	// Create the first file version being the zero hash
 	vers := NewVersionedFile(name)
 	vers.AddVersion(&FileVersion{Alias: activeVersion, ID: fs.hasher.ZeroHash()})
 
@@ -182,6 +184,8 @@ func (fs *FileSystem) Create(name string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: END REMOVE
 
 	vers.entry = entry
 	fh, err := fs.bfs.Create()
@@ -260,7 +264,8 @@ func (fs *FileSystem) Stat(name string) (os.FileInfo, error) {
 }
 
 // getDir constructs the directory object for the given filename including the underlying
-// BloxFile
+// BloxFile.  It returns the dirname, VersionedFile instance, tree instance associated to the
+// versioned file or an error.
 func (fs *FileSystem) getDir(filename string) (string, *VersionedFile, *block.TreeBlock, error) {
 	name := filepath.Dir(filename)
 	if name == "." {
