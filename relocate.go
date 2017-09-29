@@ -159,17 +159,17 @@ func (reb *Relocator) relocateBlocks(local, newPred *chord.Vnode) (n int, rt tim
 	start := time.Now()
 	out := make([]*KeyLocation, 0)
 	// This obtains a read lock.
-	reb.blkj.Iter(func(key, val []byte) error {
+	reb.blkj.Iter(func(jent *device.JournalEntry) error {
 		// Get replica hashes for a key including natural hash
-		hashes := hexaring.BuildReplicaHashes(key, reb.replicas, reb.hasher.New())
+		hashes := hexaring.BuildReplicaHashes(jent.ID(), reb.replicas, reb.hasher.New())
 		// Get location id for key based on local vnode
 		rid := getVnodeLocID(local.Id, hashes)
 		// Check if replica id is less than our new predecessor and add to list.
 		if bytes.Compare(rid, newPred.Id) <= 0 {
 
 			kloc := &KeyLocation{
-				Key:    key,
-				Marker: val,
+				Key:    jent.ID(),
+				Marker: append([]byte{byte(jent.Type())}, jent.Data()...),
 			}
 
 			out = append(out, kloc)

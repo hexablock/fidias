@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
@@ -11,14 +12,18 @@ import (
 	"github.com/hexablock/log"
 )
 
+// Healer implements an interface to submit heal requests for a given key.
 type Healer interface {
 	Heal(key []byte, opts *hexatype.RequestOptions) error
 }
 
+// FetcherTransport implements a tranport interface to fetch all entries from
+// a given entry down
 type FetcherTransport interface {
 	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.FutureEntry, error)
 }
 
+// Fetcher manages fetching block and log entries from the network
 type Fetcher struct {
 	dht DHT
 	// Used specifically to submit heal request
@@ -42,6 +47,7 @@ type Fetcher struct {
 	stopped chan struct{}
 }
 
+// NewFetcher inits a Fetcher with the given options.
 func NewFetcher(idx hexalog.IndexStore, ent hexalog.EntryStore, replicas, bufSize int, hasher hexatype.Hasher) *Fetcher {
 	return &Fetcher{
 		idx:      idx,
@@ -62,14 +68,18 @@ func (fet *Fetcher) RegisterDHT(dht DHT) {
 	fet.start()
 }
 
+// RegisterTransport registers a transport for log fetching
 func (fet *Fetcher) RegisterTransport(trans FetcherTransport) {
 	fet.trans = trans
 }
 
+// RegisterHealer registers the log healer to the fetcher to submit
+// heal requests
 func (fet *Fetcher) RegisterHealer(healer Healer) {
 	fet.heal = healer
 }
 
+// RegisterBlockTransport registers a transport for block fetching
 func (fet *Fetcher) RegisterBlockTransport(blks blox.Transport) {
 	fet.blks = blks
 }
@@ -157,19 +167,33 @@ func (fet *Fetcher) fetchBlocks() {
 			continue
 		}
 
-		// Marker contains the type and size at the bare minimum
-		m := rr.keyloc.Marker
-		typ := block.BlockType(m[0])
-
 		// Remote host to get block from
 		bb, _ := rr.mems.Self.Metadata()["blox"]
 		remote := string(bb)
 
+		// Marker contains the type and size at the bare minimum
+		m := rr.keyloc.Marker
+		typ := block.BlockType(m[0])
+
 		var blk block.Block
 		switch typ {
 		case block.BlockTypeData:
-			// Actually fetch
-			blk, err = fet.blks.GetBlock(remote, id)
+
+			// Handle larger blocks and inline blocks separately
+			if len(m) == 1 {
+				// Fetch larger blocks from remote
+				blk, err = fet.blks.GetBlock(remote, id)
+			} else {
+				// Handle inline blocks
+				blk = block.NewDataBlock(nil, fet.hasher)
+				var wr io.WriteCloser
+				wr, err = blk.Writer()
+				if err == nil {
+					if _, err = wr.Write(m[1:]); err == nil {
+						err = wr.Close()
+					}
+				}
+			}
 
 		case block.BlockTypeIndex:
 			// Inline block

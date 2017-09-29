@@ -133,6 +133,7 @@ func (fs *FileSystem) Mkdir(name string) error {
 		return err
 	}
 
+	// Update parent directory
 	if entry, opts, err = fs.hexlog.NewEntryFrom(dver.entry); err != nil {
 		return err
 	}
