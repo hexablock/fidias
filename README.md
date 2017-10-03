@@ -89,4 +89,3 @@ The cluster is now running and can be used.  Details on the HTTP API can be foun
 is incurred due to the way docker volumes and persistence are managed by docker on a Mac.
 This is only pertinent for Macs
 
-### References
