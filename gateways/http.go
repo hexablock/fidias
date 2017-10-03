@@ -1,11 +1,9 @@
 package gateways
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hexablock/blox/filesystem"
 	"github.com/hexablock/fidias"
@@ -85,26 +83,5 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (server *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
 	code = 200
 	data = server.fids.Status()
-	return
-}
-
-// handleLookup lookups the requested number of successors n.  If n is not provied it is
-// defaulted to the max no. of allowed successorss
-func (server *HTTPServer) handleLookup(w http.ResponseWriter, r *http.Request, resourceID string) (code int, headers map[string]string, data interface{}, err error) {
-
-	var n int
-	if n, err = parseIntQueryParam(r, "n"); err != nil {
-		return
-	}
-	if n == 0 {
-		n = server.ring.NumSuccessors()
-	}
-
-	code = 200
-	start := time.Now()
-	_, data, err = server.ring.Lookup(n, []byte(resourceID))
-	end := time.Since(start)
-	headers = map[string]string{headerLookupTime: fmt.Sprintf("%v", end)}
-
 	return
 }
