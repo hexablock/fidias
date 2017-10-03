@@ -15,6 +15,7 @@ p_fs="v1/fs"
 p_hexalog="v1/hexalog"
 p_lookup="v1/lookup"
 p_locate="v1/locate"
+p_status="v1/status"
 
 key="$1"
 value="$2"
