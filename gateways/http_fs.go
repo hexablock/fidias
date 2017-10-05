@@ -74,8 +74,6 @@ func (server *HTTPServer) handleFSGet(w http.ResponseWriter, resourceID string) 
 
 func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string) (int, map[string]string, interface{}, error) {
 
-	start := time.Now()
-
 	fs := server.fids.FileSystem()
 
 	code := 200
@@ -96,10 +94,7 @@ func (server *HTTPServer) handleFSStat(w http.ResponseWriter, resourceID string)
 		data = blk.(*block.IndexBlock)
 	}
 
-	rt := time.Since(start)
-	headers := map[string]string{headerRuntime: fmt.Sprintf("%v", rt)}
-
-	return code, headers, data, nil
+	return code, nil, data, nil
 }
 
 func (server *HTTPServer) handleFSVersions(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
@@ -123,12 +118,17 @@ func (server *HTTPServer) handleFSVersions(w http.ResponseWriter, r *http.Reques
 
 func (server *HTTPServer) handleFSPost(w http.ResponseWriter, r *http.Request, resourceID string) (int, map[string]string, interface{}, error) {
 
+	headers := map[string]string{}
+
 	fs := server.fids.FileSystem()
 
 	// Make directory
 	if strings.HasSuffix(resourceID, "/") {
+		start := time.Now()
 		err := fs.Mkdir(strings.TrimSuffix(resourceID, "/"))
-		return 200, nil, nil, err
+		headers[headerRuntime] = fmt.Sprintf("%v", time.Since(start))
+
+		return 200, headers, nil, err
 	}
 
 	// Create file
@@ -152,10 +152,6 @@ func (server *HTTPServer) handleFSPost(w http.ResponseWriter, r *http.Request, r
 
 	// Final response after upload completes assuming there are no errors
 	code := 201
-	headers := map[string]string{
-		headerBlockWriteTime: fmt.Sprintf("%v", fh.Runtime()),
-		headerBlockSize:      fmt.Sprintf("%d", fh.BlockSize()),
-	}
 
 	if err = fh.Close(); err == block.ErrBlockExists {
 		err = nil
@@ -163,6 +159,11 @@ func (server *HTTPServer) handleFSPost(w http.ResponseWriter, r *http.Request, r
 		// representation of the result of one or more instance-manipulations applied
 		// to the current instance
 		code = 226
+	}
+
+	headers = map[string]string{
+		headerBlockWriteTime: fmt.Sprintf("%v", fh.Runtime()),
+		headerBlockSize:      fmt.Sprintf("%d", fh.BlockSize()),
 	}
 
 	return code, headers, fh.Sys(), err

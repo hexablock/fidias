@@ -1,9 +1,11 @@
 package gateways
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hexablock/hexatype"
 )
@@ -29,9 +31,12 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 
 	switch r.Method {
 	case http.MethodGet:
+		start := time.Now()
 		data, meta, err = server.keyvs.GetKey([]byte(resourceID))
+		headers[headerRuntime] = fmt.Sprintf("%v", time.Since(start))
 
 	case http.MethodPost, http.MethodPut:
+		start := time.Now()
 		// Append a set operation entry to the log
 		var b []byte
 		if b, err = ioutil.ReadAll(r.Body); err != nil {
@@ -40,9 +45,12 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 		defer r.Body.Close()
 
 		data, meta, err = server.keyvs.SetKey([]byte(resourceID), b)
+		headers[headerRuntime] = fmt.Sprintf("%v", time.Since(start))
 
 	case http.MethodDelete:
+		start := time.Now()
 		data, meta, err = server.keyvs.RemoveKey([]byte(resourceID))
+		headers[headerRuntime] = fmt.Sprintf("%v", time.Since(start))
 
 	default:
 		code = 405
