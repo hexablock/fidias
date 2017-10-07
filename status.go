@@ -1,7 +1,9 @@
 package fidias
 
 import (
+	"github.com/hexablock/blox/device"
 	chord "github.com/hexablock/go-chord"
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
@@ -10,6 +12,8 @@ type Status struct {
 	Version string
 	Hash    hexatype.HashAlgorithm
 	DHT     *chord.Status
+	Hexalog *hexalog.Stats
+	Blox    *device.Stats
 }
 
 // Status returns the status of this node
@@ -19,5 +23,7 @@ func (fidias *Fidias) Status() *Status {
 		Version: fidias.conf.Version,
 		Hash:    fidias.conf.Hasher().Algorithm(),
 		DHT:     fidias.ring.Status(),
+		Hexalog: fidias.hexlog.Stats(),
+		Blox:    fidias.dev.Stats(),
 	}
 }

@@ -1,25 +1,23 @@
 #!/bin/bash
 
-
 source $(dirname $0)/common.sh
 
 USAGE=$(cat <<EOF
 
   Usage: $0 [ write | read ] <path-id>
-  
+
 EOF)
 
 if [ "${#@}" -ne 2 ]; then
   echo -e "${USAGE}"
   exit 2;
-fi 
+fi
 
 case $key in
   write)
-    curl -v ${host}/${p_blox} --data-binary @"${value}"
+    curl -v ${host}/${p_blox} --data-binary @"${value}" | jq .
     ;;
   read)
     curl -v -O ${host}/${p_blox}/"${value}"
     ;;
 esac
-

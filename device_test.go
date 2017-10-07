@@ -36,7 +36,7 @@ func TestRingDevice(t *testing.T) {
 	defer ts3.cleanup()
 	<-time.After(300 * time.Millisecond)
 
-	ringDev := NewRingDevice(3, ts1.hasher, ts1.btrans)
+	ringDev := NewRingDevice(3, ts1.hasher, ts1.bdev, ts1.btrans)
 	ringDev.RegisterDHT(ts1.r)
 	fs := filesystem.NewBloxFS(ringDev)
 

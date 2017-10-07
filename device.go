@@ -5,6 +5,7 @@ import (
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
+	"github.com/hexablock/blox/device"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
@@ -18,18 +19,24 @@ type RingDevice struct {
 	// Number of block replicas
 	replicas int
 	hasher   hexatype.Hasher
+	dev      *device.BlockDevice
 	// Blox transport with fast routing
 	trans blox.Transport
 }
 
 // NewRingDevice inits a new RingDevice that implements a BlockDevice with the given
 // replica count, hash function and blox transport.
-func NewRingDevice(replicas int, hasher hexatype.Hasher, trans blox.Transport) *RingDevice {
+func NewRingDevice(replicas int, hasher hexatype.Hasher, dev *device.BlockDevice, trans blox.Transport) *RingDevice {
 	return &RingDevice{
 		replicas: replicas,
 		hasher:   hasher,
+		dev:      dev,
 		trans:    trans,
 	}
+}
+
+func (dev *RingDevice) Stats() *device.Stats {
+	return dev.dev.Stats()
 }
 
 // Hasher returns the hash function generator for hash ids for the device

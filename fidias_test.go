@@ -134,7 +134,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
 	RegisterFidiasRPCServer(ts.g, fidTrans)
 
-	ts.rdev = NewRingDevice(2, ts.c.Hasher(), ts.btrans)
+	ts.rdev = NewRingDevice(2, ts.c.Hasher(), ts.bdev, ts.btrans)
 	ts.fids = New(ts.c, hexlog, fsm, rel, fet, keyvs, ts.rdev, fidTrans)
 
 	ts.start()
@@ -264,6 +264,8 @@ func TestFidias(t *testing.T) {
 	if _, _, err = ts3.fids.keyvs.GetKey([]byte("test")); err != hexatype.ErrKeyNotFound {
 		t.Fatalf("keyvs should fail with='%v' got='%v'", hexatype.ErrKeyNotFound, err)
 	}
+
+	t.Logf("%+v", ts3.fids.Status())
 
 	ts1.fids.shutdownWait()
 	ts2.fids.shutdownWait()

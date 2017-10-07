@@ -184,3 +184,7 @@ func (hexlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.K
 func (hexlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
 	return hexlog.hexlog.Heal(key, opts)
 }
+
+func (hexlog *Hexalog) Stats() *hexalog.Stats {
+	return hexlog.hexlog.Stats()
+}

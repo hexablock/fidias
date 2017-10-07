@@ -125,7 +125,7 @@ func main() {
 	rel.RegisterBlockJournal(journal)
 
 	blockReplicas := 2
-	dev := fidias.NewRingDevice(blockReplicas, conf.Hasher(), bloxTrans)
+	dev := fidias.NewRingDevice(blockReplicas, conf.Hasher(), bdev, bloxTrans)
 	log.Printf("[INFO] Default RingDevice replicas=%d", blockReplicas)
 
 	// Fidias
