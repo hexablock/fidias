@@ -27,7 +27,7 @@ type VersionedFileStore interface {
 type FileSystem struct {
 	// Hexalog namespace
 	ns []byte
-
+	// Hash function
 	hasher hexatype.Hasher
 	// DHT ring
 	dht DHT
