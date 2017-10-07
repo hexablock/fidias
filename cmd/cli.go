@@ -6,6 +6,7 @@ import (
 	"hash"
 	baselog "log"
 	"os"
+	"path/filepath"
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexatype"
@@ -29,6 +30,7 @@ var (
 
 	hashFunc = flag.String("hash", "SHA256", "Hash function to use [ SHA1 | SHA256 ]")
 	dataDir  = flag.String("data-dir", os.Getenv("FIDS_DATA_DIR"), "Path to data directory for persistence [env FIDS_DATA_DIR]")
+	uiDir    = flag.String("ui-dir", "", "Path web UI directory")
 
 	showVersion = flag.Bool("version", false, "Show version")
 	debug       = flag.Bool("debug", false, "Turn on debug mode")
@@ -66,6 +68,16 @@ func configure() *fidias.Config {
 	// advertise address for http
 	conf.Ring.Meta["http"] = []byte(*httpAdvAddr)
 	conf.Ring.Meta["blox"] = []byte(*bloxAdvAddr)
+
+	conf.Version = version
+
+	if *uiDir != "" {
+		a, err := filepath.Abs(*uiDir)
+		if err != nil {
+			log.Fatal("[ERROR]", err)
+		}
+		conf.UIDir = a
+	}
 
 	if *debug {
 		// Setup the standard built-in log for underlying libraries

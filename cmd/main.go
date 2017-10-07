@@ -148,9 +148,20 @@ func main() {
 	fids.Register(ring)
 
 	// Start HTTP API
-	log.Printf("[INFO] Starting HTTP server bind-address=%s", *httpAddr)
+	log.Printf("[INFO] Starting API server bind-address=%s", *httpAddr)
 	httpServer := gateways.NewHTTPServer("/v1", conf, ring, keyvs, logstore, dev, fids)
-	if err = http.ListenAndServe(*httpAddr, httpServer); err != nil {
+	http.Handle("/v1/", httpServer)
+
+	// HTTP UI
+	if conf.UIDir != "" {
+		log.Printf("[INFO] Starting UI directory='%s'", conf.UIDir)
+		fs := http.FileServer(http.Dir(conf.UIDir))
+		http.Handle("/", http.StripPrefix("/", fs))
+	} else {
+		log.Printf("[INFO] UI disabled")
+	}
+
+	if err = http.ListenAndServe(*httpAddr, nil); err != nil {
 		log.Fatal("[ERROR]", err)
 	}
 

@@ -11,6 +11,8 @@ import (
 
 // Config hold the guac config along with the underlying log and ring config
 type Config struct {
+	Version string // This is internally set
+
 	Ring            *chord.Config
 	Hexalog         *hexalog.Config
 	RelocateBufSize int           // Relocate request buffer size
@@ -19,6 +21,8 @@ type Config struct {
 	//StableThreshold time.Duration // Threshold after ring event to consider we are stable
 	KeyValueNamespace   string
 	FileSystemNamespace string
+	// Web UI directory
+	UIDir string
 }
 
 // Hostname returns the configured hostname. The assumption here is the log and ring
