@@ -85,7 +85,6 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 				b = t
 			} else {
 				b, _ = json.Marshal(data)
-				//w.Header().Set("Content-Type", "application/json")
 			}
 		}
 
