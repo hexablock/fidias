@@ -23,7 +23,7 @@ deps:
 	go get -d ./...
 
 test:
-	go test -cover $(shell go list ./... | grep -v /vendor/ | grep -v /cmd)
+	go test -cover $(shell go list ./... | grep -v /vendor/)
 
 show-version:
 	@echo $(VERSION)
