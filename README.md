@@ -23,14 +23,14 @@ The default cluster requires a minimum of 3 nodes to function though this can be
 **1.** Start the first node in a terminal:
 
   ```shell
-  $ fidiasd -debug -bind-addr 127.0.0.1:54321 -http-addr 127.0.0.1:9090
+  $ fidiasd -debug
   ```
 
 **2.** Start 2 or more nodes - each in separate terminals.  Change the addresses to appropriately match your configuration.
 
   ```shell
-  $ fidiasd -bind-addr 127.0.0.1:54322 -http-addr 127.0.0.1:9091 -join 127.0.0.1:54321 -debug
-  $ fidiasd -bind-addr 127.0.0.1:54323 -http-addr 127.0.0.1:9092 -join 127.0.0.1:54321 -debug
+  $ fidiasd -bind-addr 127.0.0.1:54322 -blox-addr 127.0.0.1:42101 -http-addr 127.0.0.1:9091 -join 127.0.0.1:54321 -debug
+  $ fidiasd -bind-addr 127.0.0.1:54323 -blox-addr 127.0.0.1:42102 -http-addr 127.0.0.1:9092 -join 127.0.0.1:54321 -debug
   ...
   ```
 
