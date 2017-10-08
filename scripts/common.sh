@@ -17,6 +17,24 @@ p_lookup="v1/lookup"
 p_locate="v1/locate"
 p_status="v1/status"
 
+indent() {
+    echo "${1}" | sed -e "s/^/${2}/g"
+}
+
+http_headers() {
+    echo "${1}" | grep "<" | sed -e "s/< //g"
+}
+
+http_body() {
+    echo "${resp}" | grep '{.*}' | jq .
+}
+
+http_get() {
+	resp=`curl -L -v "${1}" 2>&1`
+	http_headers "${resp}"
+    http_body "${resp}"
+}
+
 key="$1"
 value="$2"
 

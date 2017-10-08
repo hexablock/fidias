@@ -2,4 +2,15 @@
 
 source $(dirname $0)/common.sh
 
-curl -v ${host}/${p_locate}/${key} | jq .
+USAGE="\n  Usage: $0 <key>\n"
+
+if [ "${#@}" -ne 1 ]; then
+  echo -e "${USAGE}"
+  exit 2;
+fi
+
+data=`http_get "${host}/${p_locate}/${key}"`
+echo ;
+indent "$data" "  "
+echo ;
+

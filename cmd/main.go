@@ -113,6 +113,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to setup block device: %v", err)
 	}
+
+	// Ensure index and device consistency
+	if err = bdev.Open(); err != nil {
+		log.Fatal("[ERROR]", err)
+	}
 	bloxTrans := setupBlockDeviceTransport(bloxLn, bdev, conf.Hasher())
 
 	// Fetcher

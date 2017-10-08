@@ -14,13 +14,12 @@ USAGE=`cat <<EOF
     mkdir       <remote-path>
     push        <remote-path> <local-path>
     pull        <remote-path>
-  
+
 EOF`
 
-
 usage_exit() {
-	echo "${USAGE}";
-	exit $1;
+  echo "${USAGE}";
+  exit $1;
 }
 
 if [ "${#@}" -lt 2 ]; then
@@ -33,24 +32,36 @@ value=$3
 
 case $cmd in
   stat)
-    curl -v "${host}/${p_fs}/${key}?stat" | jq .
+    echo ;
+    data=`http_get "${host}/${p_fs}/${key}?stat"`
+    indent "${data}" "  "
+    echo ;
     ;;
+  
   versions)
-    curl -v "${host}/${p_fs}/${key}?versions" | jq .
+    echo ;
+    data=`http_get "${host}/${p_fs}/${key}?versions"`
+    indent "${data}" "  "
+    echo ;
     ;;
+  
   mkdir)
-	curl -v -XPOST ${host}/${p_fs}/${key}/
+    curl -v -XPOST ${host}/${p_fs}/${key}/
     ;;
+  
   pull)
     curl -v -O ${host}/${p_fs}/${key}
     ;;
+  
   push)
-	if [ "${value}" == "" ]; then
-		usage_exit 3;
-	fi
+    if [ "${value}" == "" ]; then
+      usage_exit 3;
+    fi
     curl -v -L ${host}/${p_fs}/${key} --data-binary @"${value}" | jq .
     ;;
+  
   *)
-	usage_exit 4;
-	;;
+    usage_exit 4;
+    ;;
+
 esac

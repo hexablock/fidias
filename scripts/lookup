@@ -9,4 +9,8 @@ if [ "${#@}" -ne 1 ]; then
   exit 2;
 fi
 
-curl -v ${host}/${p_lookup}/${key} | jq -r .
+data=`http_get "${host}/${p_lookup}/${key}"`
+echo ;
+indent "$data" "  "
+echo ;
+

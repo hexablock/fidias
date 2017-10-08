@@ -185,6 +185,7 @@ func (hexlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
 	return hexlog.hexlog.Heal(key, opts)
 }
 
+// Stats returns the overall log stats
 func (hexlog *Hexalog) Stats() *hexalog.Stats {
 	return hexlog.hexlog.Stats()
 }
