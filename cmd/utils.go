@@ -12,7 +12,6 @@ import (
 	"github.com/hexablock/blox/device"
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexatype"
 )
 
@@ -51,7 +50,7 @@ func setupStores(conf *fidias.Config, baseDir string) (index hexalog.IndexStore,
 	log.Printf("[INFO] Using ephemeral storage: in-memory")
 	index = hexalog.NewInMemIndexStore()
 	entries = hexalog.NewInMemEntryStore()
-	stable = &store.InMemStableStore{}
+	stable = &hexalog.InMemStableStore{}
 	fsm = fidias.NewFSM(conf.KeyValueNamespace, conf.FileSystemNamespace)
 	return
 }

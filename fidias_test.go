@@ -14,7 +14,6 @@ import (
 	"github.com/hexablock/blox/device"
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexalog/store"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
@@ -104,7 +103,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 
 	// Stores
 	idx := hexalog.NewInMemIndexStore()
-	ss := &store.InMemStableStore{}
+	ss := &hexalog.InMemStableStore{}
 	es := hexalog.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
 	fsm := NewFSM(ts.c.KeyValueNamespace, ts.c.FileSystemNamespace)
