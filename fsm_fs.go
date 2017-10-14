@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
@@ -39,7 +40,7 @@ func (store *InMemVersionedFileFSM) Get(name string) (*VersionedFile, error) {
 // ApplySet applies a set fsm operation for VersionedFiles.  This is not to be directly
 // used or called. It is called by the managing parent fsm when a fs set operation
 // entry is received by the managing parent fsm.
-func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error {
+func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, store.prefix)
 	ver := NewVersionedFile(string(key))
 	ver.entry = entry
@@ -58,7 +59,7 @@ func (store *InMemVersionedFileFSM) ApplySet(entryID []byte, entry *hexatype.Ent
 // ApplyDelete applies a delete fsm operation for VersionedFiles.  This is not to be
 // directly used or called. It is called by the managing parent fsm when a fs delete
 // operation entry is received.
-func (store *InMemVersionedFileFSM) ApplyDelete(entry *hexatype.Entry) error {
+func (store *InMemVersionedFileFSM) ApplyDelete(entry *hexalog.Entry) error {
 	key := bytes.TrimPrefix(entry.Key, store.prefix)
 	k := string(key)
 

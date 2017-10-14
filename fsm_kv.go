@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
@@ -33,7 +34,7 @@ func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 	return nil, hexatype.ErrKeyNotFound
 }
 
-func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error {
+func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, fsm.prefix)
 	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
 
@@ -44,7 +45,7 @@ func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexatype.Entry, val
 	return nil
 }
 
-func (fsm *InMemKeyValueFSM) ApplyDelete(entry *hexatype.Entry) error {
+func (fsm *InMemKeyValueFSM) ApplyDelete(entry *hexalog.Entry) error {
 	key := string(bytes.TrimPrefix(entry.Key, fsm.prefix))
 
 	fsm.mu.RLock()

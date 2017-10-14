@@ -94,7 +94,7 @@ func (reb *Relocator) relocateKeylogs(local, newPred *chord.Vnode) (n int, rt ti
 	start := time.Now()
 	out := make([]*KeyLocation, 0)
 	// This obtains a read lock.
-	reb.idx.Iter(func(key []byte, idx hexatype.KeylogIndex) error {
+	reb.idx.Iter(func(key []byte, idx hexalog.KeylogIndex) error {
 		// get replica hashes for a key including natural hash
 		hashes := hexaring.BuildReplicaHashes(key, reb.replicas, reb.hasher.New())
 		// Get location id for key based on local vnode

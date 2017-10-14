@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package fidias;
 
-import "github.com/hexablock/hexatype/types.proto";
+import "github.com/hexablock/hexalog/rpc.proto";
 //import "github.com/hexablock/go-chord/net.proto";
 
 service FidiasRPC {
@@ -29,7 +29,7 @@ message KeyLocation {
 message KeyValuePair {
     bytes Key = 1;
     bytes Value = 2;
-    hexatype.Entry Entry = 3;
+    hexalog.Entry Entry = 3;
 }
 
 message FileVersion {
@@ -40,5 +40,5 @@ message FileVersion {
 message PathRPC {
     string Name = 1;
     repeated FileVersion Versions = 2;
-    hexatype.Entry Entry = 3;
+    hexalog.Entry Entry = 3;
 }

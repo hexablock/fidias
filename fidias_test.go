@@ -103,9 +103,9 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ts.r.RegisterServer(ts.g)
 
 	// Stores
-	idx := store.NewInMemIndexStore()
+	idx := hexalog.NewInMemIndexStore()
 	ss := &store.InMemStableStore{}
-	es := store.NewInMemEntryStore()
+	es := hexalog.NewInMemEntryStore()
 	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
 	fsm := NewFSM(ts.c.KeyValueNamespace, ts.c.FileSystemNamespace)
 

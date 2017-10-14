@@ -3,6 +3,7 @@ package fidias
 import (
 	"context"
 
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 )
@@ -55,14 +56,14 @@ func (kv *Keyvs) RegisterTransport(remote KeyValueTransport) {
 // GetKey requests a key from the nodes in the key peerset concurrently and returns the first
 // non-errored result.  If the key is not found in any of the locations, a ErrKeyNotFound is
 // returned
-func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOptions, err error) {
+func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexalog.RequestOptions, err error) {
 	nskey := append(kv.ns, key...)
 
 	locs, err := kv.dht.LookupReplicated(nskey, kv.hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
 	}
-	opt = &hexatype.RequestOptions{PeerSet: locs}
+	opt = &hexalog.RequestOptions{PeerSet: locs}
 
 	ll := len(locs)
 	resp := make(chan *kvitemError, ll)
@@ -95,21 +96,21 @@ func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexatype.RequestOpt
 }
 
 // SetKey sets a key to the value
-func (kv *Keyvs) SetKey(basekey, val []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) SetKey(basekey, val []byte) (*hexalog.Entry, *hexalog.RequestOptions, error) {
 	key := append(kv.ns, basekey...)
 
 	return kv.submitLogEntry(key, append([]byte{OpSet}, val...))
 }
 
 // RemoveKey removes a key
-func (kv *Keyvs) RemoveKey(basekey []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) RemoveKey(basekey []byte) (*hexalog.Entry, *hexalog.RequestOptions, error) {
 	key := append(kv.ns, basekey...)
 
 	return kv.submitLogEntry(key, []byte{OpDel})
 }
 
 // generic function for write operations
-func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexalog.Entry, *hexalog.RequestOptions, error) {
 
 	entry, opts, err := kv.hexlog.NewEntry(key)
 	if err != nil {

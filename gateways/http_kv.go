@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
 )
 
@@ -28,7 +29,7 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 	code = 200
 	headers = make(map[string]string)
 
-	var meta *hexatype.RequestOptions
+	var meta *hexalog.RequestOptions
 
 	switch r.Method {
 	case http.MethodGet:

@@ -6,7 +6,7 @@ import (
 
 	"github.com/hexablock/blox/block"
 	"github.com/hexablock/blox/filesystem"
-	"github.com/hexablock/hexatype"
+	"github.com/hexablock/hexalog"
 )
 
 // File is a fidias file representing a standard OS file type interface.
@@ -62,8 +62,8 @@ func (file *File) Close() error {
 
 	// Update File and versions
 	var (
-		entry *hexatype.Entry
-		opts  *hexatype.RequestOptions
+		entry *hexalog.Entry
+		opts  *hexalog.RequestOptions
 	)
 	entry, opts, err = file.hexlog.NewEntryFrom(file.versions.entry)
 	if err != nil {

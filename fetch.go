@@ -14,13 +14,13 @@ import (
 
 // Healer implements an interface to submit heal requests for a given key.
 type Healer interface {
-	Heal(key []byte, opts *hexatype.RequestOptions) error
+	Heal(key []byte, opts *hexalog.RequestOptions) error
 }
 
 // FetcherTransport implements a tranport interface to fetch all entries from
 // a given entry down
 type FetcherTransport interface {
-	FetchKeylog(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) (*hexalog.FutureEntry, error)
+	FetchKeylog(host string, entry *hexalog.Entry, opts *hexalog.RequestOptions) (*hexalog.FutureEntry, error)
 }
 
 // Fetcher manages fetching block and log entries from the network
@@ -93,7 +93,7 @@ func (fet *Fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureE
 	}
 
 	var (
-		last *hexatype.Entry
+		last *hexalog.Entry
 		lid  = keyidx.Last()
 	)
 	if lid != nil {
@@ -106,7 +106,7 @@ func (fet *Fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureE
 	}
 
 	if last == nil {
-		last = &hexatype.Entry{Key: key}
+		last = &hexalog.Entry{Key: key}
 	}
 
 	return fet.trans.FetchKeylog(vn.Host, last, nil)
@@ -145,7 +145,7 @@ func (fet *Fetcher) checkKeys() {
 			continue
 		}
 
-		if err = fet.heal.Heal(key, &hexatype.RequestOptions{PeerSet: locs}); err != nil {
+		if err = fet.heal.Heal(key, &hexalog.RequestOptions{PeerSet: locs}); err != nil {
 			log.Printf("[ERROR] Heal failed key=%s error='%v'", key, err)
 		}
 

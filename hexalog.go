@@ -73,19 +73,19 @@ func (hexlog *Hexalog) MinVotes() int {
 
 // NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
 // the node is not part of the location set or a lookup error occurs
-func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (hexlog *Hexalog) NewEntry(key []byte) (*hexalog.Entry, *hexalog.RequestOptions, error) {
 	// Lookup locations for this key
 	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
 	}
-	opt := hexatype.DefaultRequestOptions()
+	opt := hexalog.DefaultRequestOptions()
 	opt.PeerSet = locs
 	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
 	// 	return nil, opt, err
 	// }
 
-	var entry *hexatype.Entry
+	var entry *hexalog.Entry
 	for i, loc := range locs {
 		if entry, err = hexlog.trans.NewEntry(loc.Host(), key); err == nil {
 			opt.SourceIndex = int32(i)
@@ -99,21 +99,21 @@ func (hexlog *Hexalog) NewEntry(key []byte) (*hexatype.Entry, *hexatype.RequestO
 // NewEntryFrom creates a new entry based on the given entry.  It uses the
 // given height and previous hash of the entry to determine the values for
 // the new entry.  This is essentially a compare and set
-func (hexlog *Hexalog) NewEntryFrom(entry *hexatype.Entry) (*hexatype.Entry, *hexatype.RequestOptions, error) {
+func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, *hexalog.RequestOptions, error) {
 
 	// Lookup locations for this key
 	locs, err := hexlog.dht.LookupReplicated(entry.Key, hexlog.MinVotes())
 	if err != nil {
 		return nil, nil, err
 	}
-	opt := hexatype.DefaultRequestOptions()
+	opt := hexalog.DefaultRequestOptions()
 	opt.PeerSet = locs
 	//opt := &hexatype.RequestOptions{SourceIndex: 0, PeerSet: locs}
 	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
 	// 	return nil, opt, err
 	// }
 
-	nentry := &hexatype.Entry{
+	nentry := &hexalog.Entry{
 		Key:       entry.Key,
 		Previous:  entry.Hash(hexlog.conf.Hasher.New()),
 		Height:    entry.Height + 1,
@@ -126,7 +126,7 @@ func (hexlog *Hexalog) NewEntryFrom(entry *hexatype.Entry) (*hexatype.Entry, *he
 // ProposeEntry finds locations for the entry and proposes it to those locations.  It retries
 // the specified number of times before returning.  It returns a ballot that can be waited on
 // for the entry to be applied or an error
-func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.RequestOptions) (err error) {
+func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions) (err error) {
 
 	retries := int(opts.Retries)
 	if retries < 1 {
@@ -151,7 +151,7 @@ func (hexlog *Hexalog) ProposeEntry(entry *hexatype.Entry, opts *hexatype.Reques
 
 // GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
 // upto the max allowed successors for each location.
-func (hexlog *Hexalog) GetEntry(key, id []byte) (entry *hexatype.Entry, meta *ReMeta, err error) {
+func (hexlog *Hexalog) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMeta, err error) {
 	meta = &ReMeta{}
 	_, err = hexlog.dht.ScourReplicatedKey(key, hexlog.MinVotes(), func(vn *chord.Vnode) error {
 		ent, er := hexlog.trans.GetEntry(vn.Host, key, id)
@@ -181,7 +181,7 @@ func (hexlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.K
 
 // Heal submits a heal request for the given key to the local note.  It consults the supplied
 // PeerSet in order to perform the heal.
-func (hexlog *Hexalog) Heal(key []byte, opts *hexatype.RequestOptions) error {
+func (hexlog *Hexalog) Heal(key []byte, opts *hexalog.RequestOptions) error {
 	return hexlog.hexlog.Heal(key, opts)
 }
 

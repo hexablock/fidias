@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hexablock/hexatype"
+	"github.com/hexablock/hexalog"
 )
 
 const activeVersion = "active"
@@ -44,7 +44,7 @@ type VersionedFile struct {
 	// Alias to version hash map
 	versions map[string]*FileVersion
 	// Entry associate to this view
-	entry *hexatype.Entry
+	entry *hexalog.Entry
 }
 
 // NewVersionedFile instantiates a new VersionedFile with the given name

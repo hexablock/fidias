@@ -7,7 +7,6 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexatype"
 )
 
 // KeyValueTransport implements a transport for key-value operations
@@ -26,14 +25,14 @@ type localHexalogTransport struct {
 	remote *hexalog.NetTransport
 }
 
-func (trans *localHexalogTransport) NewEntry(host string, key []byte) (*hexatype.Entry, error) {
+func (trans *localHexalogTransport) NewEntry(host string, key []byte) (*hexalog.Entry, error) {
 	if trans.host == host {
 		return trans.hexlog.New(key), nil
 	}
-	return trans.remote.NewEntry(host, key, &hexatype.RequestOptions{})
+	return trans.remote.NewEntry(host, key, &hexalog.RequestOptions{})
 }
 
-func (trans *localHexalogTransport) ProposeEntry(host string, entry *hexatype.Entry, opts *hexatype.RequestOptions) error {
+func (trans *localHexalogTransport) ProposeEntry(host string, entry *hexalog.Entry, opts *hexalog.RequestOptions) error {
 	if trans.host == host {
 		ballot, err := trans.hexlog.Propose(entry, opts)
 		if err != nil {
@@ -59,18 +58,18 @@ func (trans *localHexalogTransport) ProposeEntry(host string, entry *hexatype.En
 }
 
 // GetEntry gets a local or remote entry based on host
-func (trans *localHexalogTransport) GetEntry(host string, key, id []byte) (*hexatype.Entry, error) {
+func (trans *localHexalogTransport) GetEntry(host string, key, id []byte) (*hexalog.Entry, error) {
 	if trans.host == host {
 		return trans.store.GetEntry(key, id)
 	}
-	return trans.remote.GetEntry(host, key, id, &hexatype.RequestOptions{})
+	return trans.remote.GetEntry(host, key, id, &hexalog.RequestOptions{})
 }
 
-func (trans *localHexalogTransport) LastEntry(host string, key []byte) (*hexatype.Entry, error) {
+func (trans *localHexalogTransport) LastEntry(host string, key []byte) (*hexalog.Entry, error) {
 	if trans.host == host {
 		return trans.store.LastEntry(key), nil
 	}
-	return trans.remote.LastEntry(host, key, &hexatype.RequestOptions{})
+	return trans.remote.LastEntry(host, key, &hexalog.RequestOptions{})
 }
 
 type localKVTransport struct {

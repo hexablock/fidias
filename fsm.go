@@ -3,7 +3,7 @@ package fidias
 import (
 	"fmt"
 
-	"github.com/hexablock/hexatype"
+	"github.com/hexablock/hexalog"
 )
 
 const (
@@ -29,10 +29,10 @@ type FileSystemFSM interface {
 	// ApplySet is called when an entry needs to be applied. It is called
 	// with the entry and the extracted value from the entry. It should
 	// use the value bytes as the data payload
-	ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error
+	ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error
 	// ApplyDelete is called when a delete entry to needs to be applied
 	// It should remove the key and all versions given by the entry key
-	ApplyDelete(entry *hexatype.Entry) error
+	ApplyDelete(entry *hexalog.Entry) error
 }
 
 // KeyValueFSM is an FSM for a key value store.  Aside from fsm functions,
@@ -41,9 +41,9 @@ type KeyValueFSM interface {
 	// Get a key
 	Get(key []byte) (*KeyValuePair, error)
 	// Apply a set operation entry with value containing the data
-	ApplySet(entryID []byte, entry *hexatype.Entry, value []byte) error
+	ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error
 	// Apply a delete entry
-	ApplyDelete(entry *hexatype.Entry) error
+	ApplyDelete(entry *hexalog.Entry) error
 }
 
 // FSM is a hexalog FSM for an in-memory key-value store.  It implements the
@@ -81,7 +81,7 @@ func (fsm *FSM) GetPath(name string) (*VersionedFile, error) {
 // Apply applies the given entry to the FSM.  entryID is the hash id of the
 // entry.  The first byte in entry.Data contains the operation to be performed
 // followed by the actual value.
-func (fsm *FSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
+func (fsm *FSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (fsm *FSM) Close() error {
 // Apply applies the given entry to the BadgerKeyValueFSM.  entryID is the hash id of the entry.
 // The first byte in entry.Data contains the operation to be performed followed by the
 // actual value.
-// func (fsm *BadgerKeyValueFSM) Apply(entryID []byte, entry *hexatype.Entry) interface{} {
+// func (fsm *BadgerKeyValueFSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 // 	if entry.Data == nil || len(entry.Data) == 0 {
 // 		return nil
 // 	}
@@ -200,7 +200,7 @@ func (fsm *FSM) Close() error {
 // 	return resp
 // }
 
-// func (fsm *BadgerKeyValueFSM) applySet(entry *hexatype.Entry) error {
+// func (fsm *BadgerKeyValueFSM) applySet(entry *hexalog.Entry) error {
 // 	value := entry.Data[1:]
 // 	kv := &KeyValuePair{Entry: entry, Value: value, Key: entry.Key}
 // 	val, err := proto.Marshal(kv)
