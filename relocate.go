@@ -66,22 +66,24 @@ func (reb *Relocator) RegisterKeylogIndex(idx hexalog.IndexStore) {
 }
 
 func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Duration, err error) {
+	// Relocate hexalog keys
 	n, rt, err = reb.relocateKeylogs(local, newPred)
 
-	// Do this in a go-routine after keylocg relocation as it's not as critical to get the
-	// block id's across
+	// Do block relocation in a go-routine after keylocg relocation as it's not as critical
+	// to get the block id's across
 	go func() {
-		n, rt, err := reb.relocateBlocks(local, newPred)
-		if err != nil {
+
+		c, brt, er := reb.relocateBlocks(local, newPred)
+		if er != nil {
 			log.Printf("[ERROR] Relocate blocks failed src=%s/%x dst=%s/%x error='%v'",
-				local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], err)
+				local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], er)
 		} else if n > 0 {
 			log.Printf("[INFO] Relocated blocks=%d src=%s/%x dst=%s/%x runtime=%v",
-				n, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], rt)
+				c, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], brt)
 		}
 
 	}()
-
+	// Return data for hexalog relocations
 	return n, rt, err
 }
 

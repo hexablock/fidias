@@ -88,7 +88,7 @@ func (fids *Fidias) initFileSystem(trans *NetTransport) {
 		return
 	}
 
-	fids.fs = NewFileSystem(fids.conf.Hostname(), fids.conf.FileSystemNamespace,
+	fids.fs = NewFileSystem(fids.conf.Hostname(), fids.conf.Namespaces.FileSystem,
 		fids.dev, fids.hexlog, fids.fsm)
 	// Register file-system transport
 	fids.fs.RegisterTransport(trans)

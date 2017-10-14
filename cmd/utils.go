@@ -48,10 +48,10 @@ func setupStores(conf *fidias.Config, baseDir string) (index hexalog.IndexStore,
 	stable hexalog.StableStore, fsm *fidias.FSM, err error) {
 
 	log.Printf("[INFO] Using ephemeral storage: in-memory")
-	index = hexalog.NewInMemIndexStore()
 	entries = hexalog.NewInMemEntryStore()
+	index = hexalog.NewInMemIndexStore()
 	stable = &hexalog.InMemStableStore{}
-	fsm = fidias.NewFSM(conf.KeyValueNamespace, conf.FileSystemNamespace)
+	fsm = fidias.NewFSM(conf.Namespaces.KeyValue, conf.Namespaces.FileSystem)
 	return
 }
 

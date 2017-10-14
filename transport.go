@@ -9,11 +9,15 @@ import (
 	"github.com/hexablock/hexalog"
 )
 
-// KeyValueTransport implements a transport for key-value operations
+// Transport contains internal transports to handle local and remote operations
+// using a single interface
+
+// KeyValueTransport implements a transport for remote key-value operations
 type KeyValueTransport interface {
 	GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error)
 }
 
+// FileSystemTransport implements a transport for remote filesystem operations
 type FileSystemTransport interface {
 	GetPath(ctx context.Context, host string, name string) (*VersionedFile, error)
 }

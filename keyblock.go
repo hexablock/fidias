@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"bytes"
+	"log"
 	"sync"
 	"time"
 
@@ -57,6 +58,7 @@ func (kbr *keyBlockSet) set(pred, local *chord.Vnode) {
 	kbr.m[string(local.Id)] = &keyBlock{pred: pred, local: local}
 	kbr.lastChangeTime = time.Now()
 	kbr.mu.Unlock()
+	log.Printf("[INFO] New key block %s/%x %s/%x", pred.Host, pred.Id[:6], local.Host, local.Id[:6])
 }
 
 func (kbr *keyBlockSet) unset(pred, local *chord.Vnode) {

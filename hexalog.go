@@ -26,7 +26,7 @@ func NewHexalog(conf *Config, logstore *hexalog.LogStore, stable hexalog.StableS
 	// Init FSM
 	var fsm *FSM
 	if f == nil {
-		fsm = NewFSM(conf.KeyValueNamespace, conf.FileSystemNamespace)
+		fsm = NewFSM(conf.Namespaces.KeyValue, conf.Namespaces.FileSystem)
 	} else {
 		fsm = f
 	}

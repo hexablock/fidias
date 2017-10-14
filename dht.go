@@ -5,6 +5,7 @@ import (
 	"github.com/hexablock/hexaring"
 )
 
+// DHT implements lookups against a distributed hash table
 type DHT interface {
 	LookupReplicated(key []byte, replicas int) (hexaring.LocationSet, error)
 	LookupReplicatedHash(hash []byte, replicas int) (hexaring.LocationSet, error)

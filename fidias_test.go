@@ -41,6 +41,9 @@ type testServer struct {
 	r    *hexaring.Ring
 	fids *Fidias
 
+	es  hexalog.EntryStore
+	idx hexalog.IndexStore
+
 	rdev *RingDevice
 }
 
@@ -50,6 +53,11 @@ func (ts *testServer) start() {
 
 func (ts *testServer) cleanup() {
 	os.RemoveAll(ts.dir)
+}
+func (ts *testServer) shutdown() {
+	ts.idx.Close()
+	ts.es.Close()
+	ts.cleanup()
 }
 
 func (ts *testServer) setupBlox() {
@@ -101,12 +109,11 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ts.r = hexaring.New(ts.c.Ring, ts.ps, chordTrans)
 	ts.r.RegisterServer(ts.g)
 
-	// Stores
-	idx := hexalog.NewInMemIndexStore()
+	ts.es = hexalog.NewInMemEntryStore()
+	ts.idx = hexalog.NewInMemIndexStore()
 	ss := &hexalog.InMemStableStore{}
-	es := hexalog.NewInMemEntryStore()
-	ls := hexalog.NewLogStore(es, idx, ts.c.Hexalog.Hasher)
-	fsm := NewFSM(ts.c.KeyValueNamespace, ts.c.FileSystemNamespace)
+	ls := hexalog.NewLogStore(ts.es, ts.idx, ts.c.Hexalog.Hasher)
+	fsm := NewFSM(ts.c.Namespaces.KeyValue, ts.c.Namespaces.FileSystem)
 
 	// Hexalog
 	logNet := hexalog.NewNetTransport(3*time.Second, 3*time.Second)
@@ -120,17 +127,17 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ts.hasher = ts.c.Hasher()
 
 	// Fetcher
-	fet := NewFetcher(idx, es, ts.c.Hexalog.Votes, ts.c.RelocateBufSize, ts.c.Hasher())
+	fet := NewFetcher(ts.idx, ts.es, ts.c.Hexalog.Votes, ts.c.RelocateBufSize, ts.c.Hasher())
 	fet.RegisterBlockTransport(ts.btrans)
 	// Relocator
 	rel := NewRelocator(int64(ts.c.Hexalog.Votes), ts.c.Hasher())
 	rel.RegisterBlockJournal(ts.j)
-	rel.RegisterKeylogIndex(idx)
+	rel.RegisterKeylogIndex(ts.idx)
 	// Key-value
-	keyvs := NewKeyvs(ts.c.KeyValueNamespace, hexlog, fsm)
+	keyvs := NewKeyvs(ts.c.Namespaces.KeyValue, hexlog, fsm)
 
 	// Fidias
-	fidTrans := NewNetTransport(fsm, idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
+	fidTrans := NewNetTransport(fsm, ts.idx, ts.j, 30*time.Second, 3*time.Second, ts.c.Hexalog.Votes, ts.c.Hasher())
 	RegisterFidiasRPCServer(ts.g, fidTrans)
 
 	ts.rdev = NewRingDevice(2, ts.c.Hasher(), ts.bdev, ts.btrans)
@@ -170,9 +177,9 @@ func TestFidias(t *testing.T) {
 	}
 	<-time.After(300 * time.Millisecond)
 
-	defer ts1.cleanup()
-	defer ts2.cleanup()
-	defer ts3.cleanup()
+	defer ts1.shutdown()
+	defer ts2.shutdown()
+	defer ts3.shutdown()
 
 	//
 	// Hexalog
@@ -228,7 +235,7 @@ func TestFidias(t *testing.T) {
 	}
 	<-time.After(200 * time.Millisecond)
 
-	defer ts4.cleanup()
+	defer ts4.shutdown()
 
 	_, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
 	if err != nil {

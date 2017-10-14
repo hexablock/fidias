@@ -212,7 +212,7 @@ func (fet *Fetcher) fetchBlocks() {
 			}
 
 		default:
-			err = block.ErrInvalidBlockType
+			log.Printf("[ERROR] Unrecognized block type %s", typ)
 			continue
 
 		}

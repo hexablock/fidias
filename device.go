@@ -35,6 +35,7 @@ func NewRingDevice(replicas int, hasher hexatype.Hasher, dev *device.BlockDevice
 	}
 }
 
+// Stats returns device statistics
 func (dev *RingDevice) Stats() *device.Stats {
 	return dev.dev.Stats()
 }
