@@ -77,7 +77,7 @@ func (reb *Relocator) relocate(local, newPred *chord.Vnode) (n int, rt time.Dura
 		if er != nil {
 			log.Printf("[ERROR] Relocate blocks failed src=%s/%x dst=%s/%x error='%v'",
 				local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], er)
-		} else if n > 0 {
+		} else if c > 0 {
 			log.Printf("[INFO] Relocated blocks=%d src=%s/%x dst=%s/%x runtime=%v",
 				c, local.Host, local.Id[:12], newPred.Host, newPred.Id[:12], brt)
 		}

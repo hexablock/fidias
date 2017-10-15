@@ -43,6 +43,7 @@ type testServer struct {
 
 	es  hexalog.EntryStore
 	idx hexalog.IndexStore
+	ss  hexalog.StableStore
 
 	rdev *RingDevice
 }
@@ -109,9 +110,12 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	ts.r = hexaring.New(ts.c.Ring, ts.ps, chordTrans)
 	ts.r.RegisterServer(ts.g)
 
-	ts.es = hexalog.NewInMemEntryStore()
-	ts.idx = hexalog.NewInMemIndexStore()
-	ss := &hexalog.InMemStableStore{}
+	//ts.idx, ts.es, ts.ss = InitInmemStores()
+	ts.idx, ts.es, ts.ss, err = InitPersistenStores(ts.dir)
+	if err != nil {
+		return nil, err
+	}
+
 	ls := hexalog.NewLogStore(ts.es, ts.idx, ts.c.Hexalog.Hasher)
 	fsm := NewFSM(ts.c.Namespaces.KeyValue, ts.c.Namespaces.FileSystem)
 
@@ -119,7 +123,7 @@ func newTestServer(addr, bloxAddr string, peers ...string) (*testServer, error) 
 	logNet := hexalog.NewNetTransport(3*time.Second, 3*time.Second)
 	hexalog.RegisterHexalogRPCServer(ts.g, logNet)
 
-	hexlog, err := NewHexalog(ts.c, ls, ss, fsm, logNet)
+	hexlog, err := NewHexalog(ts.c, ls, ts.ss, fsm, logNet)
 	if err != nil {
 		return nil, err
 	}

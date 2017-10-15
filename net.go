@@ -206,6 +206,7 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 		if ki.Marker() != nil {
 			trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
 		}
+		ki.Close()
 	} // end loop
 
 }

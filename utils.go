@@ -1,6 +1,14 @@
 package fidias
 
-import "bytes"
+import (
+	"bytes"
+	"log"
+	"os"
+	"path/filepath"
+
+	hexaboltdb "github.com/hexablock/hexa-boltdb"
+	"github.com/hexablock/hexalog"
+)
 
 // // Checks if a key is STRICTLY between two ID's exclusively
 // func between(id1, id2, key []byte) bool {
@@ -48,4 +56,33 @@ func getVnodeLocID(hash []byte, locs [][]byte) []byte {
 	}
 
 	return locs[l-1]
+}
+
+func InitInmemStores() (*hexalog.InMemIndexStore, *hexalog.InMemEntryStore, *hexalog.InMemStableStore) {
+	entries := hexalog.NewInMemEntryStore()
+	index := hexalog.NewInMemIndexStore()
+	stable := &hexalog.InMemStableStore{}
+
+	log.Printf("[INFO] Using ephemeral storage: in-memory")
+
+	return index, entries, stable
+}
+
+func InitPersistenStores(dir string) (*hexaboltdb.IndexStore, *hexaboltdb.EntryStore, *hexalog.InMemStableStore, error) {
+	edir := filepath.Join(dir, "log", "entry")
+	os.MkdirAll(edir, 0755)
+	entries := hexaboltdb.NewEntryStore()
+	if err := entries.Open(edir); err != nil {
+		return nil, nil, nil, err
+	}
+
+	edir = filepath.Join(dir, "log", "index")
+	os.MkdirAll(edir, 0755)
+	index := hexaboltdb.NewIndexStore()
+	if err := index.Open(edir); err != nil {
+		return nil, nil, nil, err
+	}
+
+	stable := &hexalog.InMemStableStore{}
+	return index, entries, stable, nil
 }

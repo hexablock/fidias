@@ -47,10 +47,10 @@ func setupBlockDevice(basedir string, hasher hexatype.Hasher) (device.Journal, *
 func setupStores(conf *fidias.Config, baseDir string) (index hexalog.IndexStore, entries hexalog.EntryStore,
 	stable hexalog.StableStore, fsm *fidias.FSM, err error) {
 
-	log.Printf("[INFO] Using ephemeral storage: in-memory")
-	entries = hexalog.NewInMemEntryStore()
-	index = hexalog.NewInMemIndexStore()
-	stable = &hexalog.InMemStableStore{}
+	index, entries, stable, err = fidias.InitPersistenStores(baseDir)
+	if err != nil {
+		return
+	}
 	fsm = fidias.NewFSM(conf.Namespaces.KeyValue, conf.Namespaces.FileSystem)
 	return
 }

@@ -6,7 +6,10 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -165,6 +168,17 @@ func main() {
 	} else {
 		log.Printf("[INFO] UI disabled")
 	}
+
+	go func(idx hexalog.IndexStore) {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-sig
+		if er := idx.Close(); er != nil {
+			log.Printf("[ERROR] Index store dirty shutdown: %v", er)
+		} else {
+			log.Printf("[INFO] Index store clean shutdown!")
+		}
+	}(index)
 
 	if err = http.ListenAndServe(*httpAddr, nil); err != nil {
 		log.Fatal("[ERROR]", err)

@@ -65,6 +65,7 @@ func NewFetcher(idx hexalog.IndexStore, ent hexalog.EntryStore, replicas, bufSiz
 // must be called after the transport and healer interfaces have been registered.
 func (fet *Fetcher) RegisterDHT(dht DHT) {
 	fet.dht = dht
+	// TODO: start after enough replica peers are avail.
 	fet.start()
 }
 
@@ -96,6 +97,9 @@ func (fet *Fetcher) fetch(vn *chord.Vnode, key, marker []byte) (*hexalog.FutureE
 		last *hexalog.Entry
 		lid  = keyidx.Last()
 	)
+
+	keyidx.Close()
+
 	if lid != nil {
 		// Skip if marker and last entry id match
 		if bytes.Compare(lid, marker) == 0 {
