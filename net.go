@@ -22,7 +22,6 @@ type KeyValueStore interface {
 // LocalStore implements all local calls needed by the network transport
 type LocalStore interface {
 	KeyValueStore
-	VersionedFileStore
 }
 
 type streamBase struct {
@@ -99,56 +98,9 @@ func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) 
 	return kvp, err
 }
 
-func (trans *NetTransport) GetPath(ctx context.Context, host string, name string) (*VersionedFile, error) {
-	conn, err := trans.pool.getConn(host)
-	if err != nil {
-		return nil, err
-	}
-	defer trans.pool.returnConn(conn)
-
-	req := &PathRPC{Name: name}
-	resp, err := conn.client.GetPathRPC(ctx, req)
-	if err != nil {
-		return nil, hexatype.ParseGRPCError(err)
-	}
-	// New from remote, though we may have one locally as well
-	verf := NewVersionedFile(name)
-	verf.entry = resp.Entry
-	for _, ver := range resp.Versions {
-		if err = verf.AddVersion(ver); err != nil {
-			break
-		}
-	}
-
-	return verf, err
-}
-
 // GetKeyRPC serves a GetKey request
 func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*KeyValuePair, error) {
 	return trans.local.GetKey(in.Key)
-}
-
-// GetPathRPC serves a GetPath request
-func (trans *NetTransport) GetPathRPC(ctx context.Context, in *PathRPC) (*PathRPC, error) {
-	// We don't send the name for efficiency i.e resp.Name = verfile.name, as the
-	// requestor already knows the name and can populate it there rather than
-	// server sending it again over the wire
-	resp := &PathRPC{}
-
-	verfile, err := trans.local.GetPath(in.Name)
-	if err != nil {
-		return resp, err
-	}
-
-	resp.Entry = verfile.entry
-	resp.Versions = make([]*FileVersion, len(verfile.versions))
-	var i int
-	for _, ver := range verfile.versions {
-		resp.Versions[i] = ver
-		i++
-	}
-
-	return resp, nil
 }
 
 // GetRelocateStream gets a stream to send relocation keys

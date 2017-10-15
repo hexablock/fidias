@@ -28,9 +28,6 @@ type Fidias struct {
 	keyvs *Keyvs
 	// Ring backed BlockDevice
 	dev *RingDevice
-	// Filesystem
-	fs *FileSystem
-
 	// Blocks of keys this node is responsible for. These are the local vnodes and
 	// their respective predecessors
 	keyblocks *keyBlockSet
@@ -74,29 +71,10 @@ func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher 
 	// Register keyvs transport
 	fids.keyvs.RegisterTransport(trans)
 
-	// Init FS
-	fids.initFileSystem(trans)
-
 	// Set self as the chord delegate
 	conf.Ring.Delegate = fids
 
 	return fids
-}
-
-func (fids *Fidias) initFileSystem(trans *NetTransport) {
-	if fids.dev == nil {
-		return
-	}
-
-	fids.fs = NewFileSystem(fids.conf.Hostname(), fids.conf.Namespaces.FileSystem,
-		fids.dev, fids.hexlog, fids.fsm)
-	// Register file-system transport
-	fids.fs.RegisterTransport(trans)
-}
-
-// FileSystem returns the fidias file-system
-func (fids *Fidias) FileSystem() *FileSystem {
-	return fids.fs
 }
 
 // Register registers the chord ring to fidias.  This is due to the fact that guac and the
@@ -114,7 +92,6 @@ func (fids *Fidias) Register(ring *hexaring.Ring) {
 	if fids.dev != nil {
 
 		fids.dev.RegisterDHT(ring)
-		fids.fs.RegisterDHT(ring)
 
 		log.Printf("[INFO] FileSystem initialization complete")
 	}

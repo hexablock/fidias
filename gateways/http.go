@@ -62,9 +62,6 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(reqpath, "blox") {
 		server.handleBlox(w, r, strings.TrimPrefix(reqpath, "blox/"))
 		return
-	} else if strings.HasPrefix(reqpath, "fs") {
-		server.handleFS(w, r, strings.TrimPrefix(reqpath, "fs/"))
-		return
 	}
 
 	// Remove trailing for all remaining handlers

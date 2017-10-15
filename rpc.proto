@@ -8,8 +8,6 @@ import "github.com/hexablock/hexalog/rpc.proto";
 service FidiasRPC {
     // Get key-value pair from remote
     rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
-    // Get versioned path from remote
-    rpc GetPathRPC(PathRPC) returns (PathRPC) {}
     // Send key-location id pairs
     rpc RelocateRPC(stream KeyLocation) returns (stream KeyLocation) {}
     // Send block id and journal value
@@ -29,16 +27,5 @@ message KeyLocation {
 message KeyValuePair {
     bytes Key = 1;
     bytes Value = 2;
-    hexalog.Entry Entry = 3;
-}
-
-message FileVersion {
-    string Alias = 1;
-    bytes ID = 2;
-}
-
-message PathRPC {
-    string Name = 1;
-    repeated FileVersion Versions = 2;
     hexalog.Entry Entry = 3;
 }

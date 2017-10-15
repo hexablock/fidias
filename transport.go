@@ -17,11 +17,6 @@ type KeyValueTransport interface {
 	GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error)
 }
 
-// FileSystemTransport implements a transport for remote filesystem operations
-type FileSystemTransport interface {
-	GetPath(ctx context.Context, host string, name string) (*VersionedFile, error)
-}
-
 type localHexalogTransport struct {
 	host   string
 	hexlog *hexalog.Hexalog
@@ -92,22 +87,4 @@ func (trans *localKVTransport) GetKey(ctx context.Context, host string, key []by
 		}
 	}
 	return trans.remote.GetKey(ctx, host, key)
-}
-
-type localFileSystemTransport struct {
-	host   string
-	local  VersionedFileStore
-	remote FileSystemTransport
-}
-
-func (trans *localFileSystemTransport) GetPath(ctx context.Context, host string, name string) (*VersionedFile, error) {
-	if trans.host == host {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("GetPath context cancelled")
-		default:
-			return trans.local.GetPath(name)
-		}
-	}
-	return trans.remote.GetPath(ctx, host, name)
 }
