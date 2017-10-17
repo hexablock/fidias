@@ -241,6 +241,11 @@ func TestFidias(t *testing.T) {
 
 	defer ts4.shutdown()
 
+	_, _, err = ts3.fids.keyvs.SetKey([]byte("blubber/test"), []byte("val"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	_, meta, err := ts3.fids.keyvs.SetKey([]byte("test"), []byte("val"))
 	if err != nil {
 		t.Fatal(err)
@@ -249,13 +254,6 @@ func TestFidias(t *testing.T) {
 		t.Fatal("should have 3 peers")
 	}
 
-	// if _, err = fut.Wait(2 * time.Second); err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	//
-	// Keyvs
-	//
 	gk, _, err := ts3.fids.keyvs.GetKey([]byte("test"))
 	if err != nil {
 		t.Fatal(err)

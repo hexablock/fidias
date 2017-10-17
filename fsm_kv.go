@@ -34,10 +34,11 @@ func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 	return nil, hexatype.ErrKeyNotFound
 }
 
+// ApplySet applies a hexalog set entry to the kv fsm
 func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, fsm.prefix)
-	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
 
+	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
 	fsm.mu.Lock()
 	fsm.kv[string(key)] = kv
 	fsm.mu.Unlock()
