@@ -27,5 +27,7 @@ message KeyLocation {
 message KeyValuePair {
     bytes Key = 1;
     bytes Value = 2;
-    hexalog.Entry Entry = 3;
+    int64 Flags = 3;
+    bytes Modification = 4;
+    hexalog.Entry Entry = 5;
 }

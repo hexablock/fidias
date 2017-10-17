@@ -10,31 +10,6 @@ import (
 	"github.com/hexablock/hexalog"
 )
 
-// // Checks if a key is STRICTLY between two ID's exclusively
-// func between(id1, id2, key []byte) bool {
-// 	// Check for ring wrap around
-// 	if bytes.Compare(id1, id2) == 1 {
-// 		return bytes.Compare(id1, key) == -1 ||
-// 			bytes.Compare(id2, key) == 1
-// 	}
-//
-// 	// Handle the normal case
-// 	return bytes.Compare(id1, key) == -1 &&
-// 		bytes.Compare(id2, key) == 1
-// }
-//
-// // Checks if a key is between two ID's, right inclusive
-// func betweenRightIncl(id1, id2, key []byte) bool {
-// 	// Check for ring wrap around
-// 	if bytes.Compare(id1, id2) == 1 {
-// 		return bytes.Compare(id1, key) == -1 ||
-// 			bytes.Compare(id2, key) >= 0
-// 	}
-//
-// 	return bytes.Compare(id1, key) == -1 &&
-// 		bytes.Compare(id2, key) >= 0
-// }
-
 func betweenLeftIncl(id1, id2, key []byte) bool {
 	// Check for ring wrap around
 	if bytes.Compare(id1, id2) == 1 {
@@ -58,6 +33,7 @@ func getVnodeLocID(hash []byte, locs [][]byte) []byte {
 	return locs[l-1]
 }
 
+// InitInmemStores is a helper function to init in-memory datastores
 func InitInmemStores() (*hexalog.InMemIndexStore, *hexalog.InMemEntryStore, *hexalog.InMemStableStore) {
 	entries := hexalog.NewInMemEntryStore()
 	index := hexalog.NewInMemIndexStore()
@@ -68,6 +44,7 @@ func InitInmemStores() (*hexalog.InMemIndexStore, *hexalog.InMemEntryStore, *hex
 	return index, entries, stable
 }
 
+// InitPersistenStores is a helper function to init persisten datastores
 func InitPersistenStores(dir string) (*hexaboltdb.IndexStore, *hexaboltdb.EntryStore, *hexalog.InMemStableStore, error) {
 	edir := filepath.Join(dir, "log", "entry")
 	os.MkdirAll(edir, 0755)

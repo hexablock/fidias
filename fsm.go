@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hexablock/hexalog"
 )
@@ -54,6 +55,7 @@ func (fsm *FSM) GetKey(key []byte) (*KeyValuePair, error) {
 // followed by the actual value.
 func (fsm *FSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
+		log.Printf("[WARNING] Hexalog entry data missing key=%s", entry.Key)
 		return nil
 	}
 

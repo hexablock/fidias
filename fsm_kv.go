@@ -38,7 +38,13 @@ func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error {
 	key := bytes.TrimPrefix(entry.Key, fsm.prefix)
 
-	kv := &KeyValuePair{Entry: entry, Value: value, Key: key}
+	kv := &KeyValuePair{
+		Key:          key,
+		Value:        value,
+		Modification: entryID,
+		Entry:        entry,
+	}
+
 	fsm.mu.Lock()
 	fsm.kv[string(key)] = kv
 	fsm.mu.Unlock()
@@ -46,6 +52,7 @@ func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexalog.Entry, valu
 	return nil
 }
 
+// ApplyDelete applies a hexalog delete operation entry to the fsm
 func (fsm *InMemKeyValueFSM) ApplyDelete(entry *hexalog.Entry) error {
 	key := string(bytes.TrimPrefix(entry.Key, fsm.prefix))
 
