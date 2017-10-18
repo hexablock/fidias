@@ -266,9 +266,11 @@ func TestFidias(t *testing.T) {
 	}
 
 	if _, _, err = ts2.fids.keyvs.RemoveKey([]byte("test")); err != nil {
-		t.Fatal("failed to removed", err)
+		t.Fatal("failed to remove key:", err)
 	}
 
+	// Wait apply
+	<-time.After(200 * time.Millisecond)
 	if _, _, err = ts3.fids.keyvs.GetKey([]byte("test")); err != hexatype.ErrKeyNotFound {
 		t.Fatalf("keyvs should fail with='%v' got='%v'", hexatype.ErrKeyNotFound, err)
 	}
