@@ -30,6 +30,7 @@ func newOutPool(maxIdle, reapInterval time.Duration) *outPool {
 }
 
 func (pool *outPool) returnConn(o *rpcOutConn) {
+	// Close and discard connection if we've shutdown
 	if atomic.LoadInt32(&pool.stopped) == 1 {
 		o.conn.Close()
 		return

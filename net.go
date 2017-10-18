@@ -36,30 +36,37 @@ func (rs *streamBase) Recycle() {
 
 // RelocateStream is a stream to handle relocating of keys between nodes.
 type RelocateStream struct {
+	// base containing the conn. and conn. pool
 	*streamBase
-	FidiasRPC_RelocateRPCClient // grp stream client
-
+	// grpc stream client
+	FidiasRPC_RelocateRPCClient
 }
 
+// RelocateBlocksStream is a stream to handle relocating blocks between nodes.  It is
+// used to push blocks from the local to remote host
 type RelocateBlocksStream struct {
+	// base containing the conn. and conn. pool
 	*streamBase
-	FidiasRPC_RelocateBlocksRPCClient // grp stream client
+	// grpc stream client
+	FidiasRPC_RelocateBlocksRPCClient
 }
 
 // NetTransport implements a network transport needed for fidias
 type NetTransport struct {
 	local LocalStore
-
-	idxs    hexalog.IndexStore // hexalog index store
-	journal device.Journal     // BlockDevice journal
-
+	// hexalog keylog index store
+	idxs hexalog.IndexStore
+	// BlockDevice index/journal
+	journal device.Journal
+	// default replica count
 	replicas int
-	hasher   hexatype.Hasher
+	// hash function to use
+	hasher hexatype.Hasher
 	// Incoming relocation requests. i.e. keys this node needs to take over.
 	fetCh chan<- *relocateReq
 	// Incoming block relocation requests
 	fetBlks chan<- *relocateReq
-
+	// all outbound connections
 	pool     *outPool
 	shutdown int32
 }
@@ -76,7 +83,8 @@ func NewNetTransport(localStore LocalStore, idx hexalog.IndexStore, journal devi
 	}
 }
 
-// Register registers a write channel used for submitting reloc. requests for keylogs and blocks.
+// Register registers a write channel used for submitting reloc. requests for keylogs and
+// blocks.
 func (trans *NetTransport) Register(fetLogCh, fetBlkCh chan<- *relocateReq) {
 	trans.fetCh = fetLogCh
 	trans.fetBlks = fetBlkCh
@@ -153,8 +161,8 @@ func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error
 			continue
 		}
 
-		// Only continue relocating the key if the marker was set.  If the marker was not set
-		// it means we already have the marker entry and nothing needs to be done.
+		// Only continue relocating the key if the marker was set.  If the marker was not
+		// set it means we already have the marker entry and nothing needs to be done.
 		if ki.Marker() != nil {
 			trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
 		}
@@ -187,8 +195,8 @@ func (trans *NetTransport) GetRelocateBlocksStream(local, remote *chord.Vnode) (
 	}, nil
 }
 
-// RelocateBlocksRPC serves a GetRelocateStream request stream.  It initiates the process to
-// start taking over the sent keys.
+// RelocateBlocksRPC serves a GetRelocateStream request stream.  It initiates the process
+// to start taking over the sent keys.
 func (trans *NetTransport) RelocateBlocksRPC(stream FidiasRPC_RelocateBlocksRPCServer) error {
 
 	var preamble chord.VnodePair

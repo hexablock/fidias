@@ -9,12 +9,15 @@ import (
 	"github.com/hexablock/hexatype"
 )
 
+// InMemKeyValueFSM is an in-memory key-value finite state machine.  This is only meant
+// to be used for development and testing.
 type InMemKeyValueFSM struct {
 	prefix []byte // Hexalog entry key prefix
 	mu     sync.RWMutex
 	kv     map[string]*KeyValuePair
 }
 
+// NewInMemKeyValueFSM inits a new in-memory key-value FSM interface
 func NewInMemKeyValueFSM(prefix string) *InMemKeyValueFSM {
 	return &InMemKeyValueFSM{
 		prefix: []byte(prefix),
@@ -22,6 +25,7 @@ func NewInMemKeyValueFSM(prefix string) *InMemKeyValueFSM {
 	}
 }
 
+//Get retrieves a key-value pair associated to the key
 func (fsm *InMemKeyValueFSM) Get(key []byte) (*KeyValuePair, error) {
 	fsm.mu.RLock()
 	value, ok := fsm.kv[string(key)]
