@@ -8,7 +8,21 @@ import (
 
 	hexaboltdb "github.com/hexablock/hexa-boltdb"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexaring"
 )
+
+func locationsToParticipants(locs []*hexaring.Location) []*hexalog.Participant {
+	out := make([]*hexalog.Participant, len(locs))
+	for i, v := range locs {
+		out[i] = &hexalog.Participant{
+			ID:       v.ID,
+			Host:     v.Host(),
+			Priority: v.Priority,
+			Index:    v.Index,
+		}
+	}
+	return out
+}
 
 func betweenLeftIncl(id1, id2, key []byte) bool {
 	// Check for ring wrap around

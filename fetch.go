@@ -149,7 +149,9 @@ func (fet *Fetcher) checkKeys() {
 			continue
 		}
 
-		if err = fet.heal.Heal(key, &hexalog.RequestOptions{PeerSet: locs}); err != nil {
+		ps := locationsToParticipants(locs)
+
+		if err = fet.heal.Heal(key, &hexalog.RequestOptions{PeerSet: ps}); err != nil {
 			log.Printf("[ERROR] Heal failed key=%s error='%v'", key, err)
 		}
 

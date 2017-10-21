@@ -3,8 +3,8 @@ package gateways
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hexablock/hexalog"
@@ -65,9 +65,10 @@ func (server *HTTPServer) handleKeyValue(w http.ResponseWriter, r *http.Request,
 
 	if err == hexatype.ErrKeyNotFound {
 		code = 404
-	} else if strings.Contains(err.Error(), "host not in set") {
-		code, headers, data, err = buildRedirect(meta.PeerSet, r.URL.RequestURI())
-	}
+	} //else if strings.Contains(err.Error(), "host not in set") {
+	//code, headers, data, err = buildRedirect(meta.PeerSet, r.URL.RequestURI())
+	//}
+	log.Printf("[TRACE] Meta: %+v", meta)
 
 	return
 }

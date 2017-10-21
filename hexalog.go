@@ -2,12 +2,10 @@ package fidias
 
 import (
 	"io"
-	"log"
 	"time"
 
 	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexaring"
 	"github.com/hexablock/hexatype"
 )
 
@@ -81,7 +79,7 @@ func (hexlog *Hexalog) NewEntry(key []byte) (*hexalog.Entry, *hexalog.RequestOpt
 		return nil, nil, err
 	}
 	opt := hexalog.DefaultRequestOptions()
-	opt.PeerSet = locs
+	opt.PeerSet = locationsToParticipants(locs)
 	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
 	// 	return nil, opt, err
 	// }
@@ -108,7 +106,7 @@ func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, *hexa
 		return nil, nil, err
 	}
 	opt := hexalog.DefaultRequestOptions()
-	opt.PeerSet = locs
+	opt.PeerSet = locationsToParticipants(locs)
 	//opt := &hexatype.RequestOptions{SourceIndex: 0, PeerSet: locs}
 	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
 	// 	return nil, opt, err
@@ -128,7 +126,7 @@ func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, *hexa
 // the specified number of times before returning.  It returns a ballot that can be waited on
 // for the entry to be applied or an error
 func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions) (err error) {
-	log.Printf("[DEBUG] Proposal peer set %s", hexaring.LocationSet(opts.PeerSet))
+	//log.Printf("[DEBUG] Proposal peer set %s", hexaring.LocationSet(opts.PeerSet))
 	retries := int(opts.Retries)
 	if retries < 1 {
 		retries = 1
@@ -137,7 +135,7 @@ func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestO
 	for i := 0; i < retries; i++ {
 		// Propose with retries.  Retry only on a ErrPreviousHash error
 		//if ballot, err = hexlog.hexlog.Propose(entry, opts); err == nil {
-		if err = hexlog.trans.ProposeEntry(opts.PeerSet[0].Host(), entry, opts); err == nil {
+		if err = hexlog.trans.ProposeEntry(opts.PeerSet[0].Host, entry, opts); err == nil {
 			return
 		} else if err == hexatype.ErrPreviousHash {
 			time.Sleep(hexlog.retryInt)
@@ -176,7 +174,7 @@ func (hexlog *Hexalog) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReM
 }
 
 // Leader returns the leader of the given location set from the underlying log.
-func (hexlog *Hexalog) Leader(key []byte, locs hexaring.LocationSet) (*hexalog.KeyLeader, error) {
+func (hexlog *Hexalog) Leader(key []byte, locs []*hexalog.Participant) (*hexalog.KeyLeader, error) {
 	return hexlog.hexlog.Leader(key, locs)
 }
 

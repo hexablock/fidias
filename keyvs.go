@@ -63,7 +63,8 @@ func (kv *Keyvs) GetKey(key []byte) (kvp *KeyValuePair, opt *hexalog.RequestOpti
 	if err != nil {
 		return nil, nil, err
 	}
-	opt = &hexalog.RequestOptions{PeerSet: locs}
+	participants := locationsToParticipants(locs)
+	opt = &hexalog.RequestOptions{PeerSet: participants}
 
 	ll := len(locs)
 	resp := make(chan *kvitemError, ll)
