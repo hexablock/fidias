@@ -46,7 +46,6 @@ func (fsm *InMemKeyValueFSM) ApplySet(entryID []byte, entry *hexalog.Entry, valu
 		Key:          key,
 		Value:        value,
 		Modification: entryID,
-		Entry:        entry,
 	}
 
 	fsm.mu.Lock()

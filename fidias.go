@@ -7,6 +7,13 @@ import (
 	"github.com/hexablock/hexaring"
 )
 
+// DHT implements lookups against a distributed hash table
+type DHT interface {
+	LookupReplicated(key []byte, replicas int) (hexaring.LocationSet, error)
+	LookupReplicatedHash(hash []byte, replicas int) (hexaring.LocationSet, error)
+	ScourReplicatedKey(key []byte, replicas int, cb func(*chord.Vnode) error) (int, error)
+}
+
 // ReMeta contains metadata associated to a request or response
 type ReMeta struct {
 	Vnode   *chord.Vnode         // vnode processing the request or response

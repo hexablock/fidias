@@ -20,7 +20,7 @@ type RelocatorTransport interface {
 
 // rebReq contains data for perform a relocation
 type relocateReq struct {
-	keyloc *KeyLocation
+	keyloc *KeyState
 	mems   *chord.VnodePair
 }
 
@@ -94,7 +94,7 @@ func (reb *Relocator) relocateKeylogs(local, newPred *chord.Vnode) (n int, rt ti
 	// and new pred vnode, then selecting keys who's replica id's are <= to the new
 	// predecessor
 	start := time.Now()
-	out := make([]*KeyLocation, 0)
+	out := make([]*KeyState, 0)
 	// This obtains a read lock.
 	reb.idx.Iter(func(key []byte, idx hexalog.KeylogIndex) error {
 		// get replica hashes for a key including natural hash
@@ -110,7 +110,7 @@ func (reb *Relocator) relocateKeylogs(local, newPred *chord.Vnode) (n int, rt ti
 				marker = idx.Marker()
 			}
 
-			kloc := &KeyLocation{
+			kloc := &KeyState{
 				Key:    key,
 				Marker: marker,
 				Height: idx.Height(),
@@ -159,7 +159,7 @@ func (reb *Relocator) relocateBlocks(local, newPred *chord.Vnode) (n int, rt tim
 	// and new pred vnode, then selecting keys who's replica id's are <= to the new
 	// predecessor
 	start := time.Now()
-	out := make([]*KeyLocation, 0)
+	out := make([]*KeyState, 0)
 	// This obtains a read lock.
 	reb.blkj.Iter(func(jent *device.JournalEntry) error {
 		// Get replica hashes for a key including natural hash
@@ -169,7 +169,7 @@ func (reb *Relocator) relocateBlocks(local, newPred *chord.Vnode) (n int, rt tim
 		// Check if replica id is less than our new predecessor and add to list.
 		if bytes.Compare(rid, newPred.Id) <= 0 {
 
-			kloc := &KeyLocation{
+			kloc := &KeyState{
 				Key:    jent.ID(),
 				Marker: append([]byte{byte(jent.Type())}, jent.Data()...),
 			}

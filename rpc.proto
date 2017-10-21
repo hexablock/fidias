@@ -2,19 +2,16 @@ syntax = "proto3";
 
 package fidias;
 
-import "github.com/hexablock/hexalog/rpc.proto";
-//import "github.com/hexablock/go-chord/net.proto";
-
 service FidiasRPC {
     // Get key-value pair from remote
     rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
     // Send key-location id pairs
-    rpc RelocateRPC(stream KeyLocation) returns (stream KeyLocation) {}
+    rpc RelocateRPC(stream KeyState) returns (stream KeyState) {}
     // Send block id and journal value
-    rpc RelocateBlocksRPC(stream KeyLocation) returns (stream KeyLocation) {}
+    rpc RelocateBlocksRPC(stream KeyState) returns (stream KeyState) {}
 }
 
-message KeyLocation {
+message KeyState {
     // Actual key
     bytes Key = 1;
     // Location id or last entry or id
@@ -26,8 +23,10 @@ message KeyLocation {
 
 message KeyValuePair {
     bytes Key = 1;
+    // Arbitrary data
     bytes Value = 2;
+    // Artibrary integer flags
     int64 Flags = 3;
+    // Entry id resulting in the view
     bytes Modification = 4;
-    hexalog.Entry Entry = 5;
 }
