@@ -29,4 +29,6 @@ message KeyValuePair {
     int64 Flags = 3;
     // Entry id resulting in the view
     bytes Modification = 4;
+    // Entry height
+    uint32 Height = 5;
 }
