@@ -35,13 +35,11 @@ func NewHexalog(conf *Config, logstore *hexalog.LogStore, stable hexalog.StableS
 	}
 
 	retryInt := 10 * time.Millisecond
-	// remote := hexalog.NewNetTransport(reapInterval, maxIdle)
 
 	hexlog, err := hexalog.NewHexalog(conf.Hexalog, fsm, logstore, stable, remote)
 	if err != nil {
 		return nil, err
 	}
-	remote.Register(hexlog)
 
 	trans := &localHexalogTransport{
 		host:   conf.Hostname(),
@@ -125,9 +123,9 @@ func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, *hexa
 // ProposeEntry finds locations for the entry and proposes it to those locations.  It retries
 // the specified number of times before returning.  It returns a ballot that can be waited on
 // for the entry to be applied or an error
-func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions) (err error) {
+func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions, retries int) (err error) {
 	//log.Printf("[DEBUG] Proposal peer set %s", hexaring.LocationSet(opts.PeerSet))
-	retries := int(opts.Retries)
+	//retries := int(opts.Retries)
 	if retries < 1 {
 		retries = 1
 	}

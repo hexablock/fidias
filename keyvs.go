@@ -120,7 +120,7 @@ func (kv *Keyvs) submitLogEntry(key []byte, data []byte) (*hexalog.Entry, *hexal
 	entry.Data = data
 
 	opts.WaitBallot = true
-	err = kv.hexlog.ProposeEntry(entry, opts)
+	err = kv.hexlog.ProposeEntry(entry, opts, 2)
 
 	return entry, opts, err
 }

@@ -202,7 +202,7 @@ func TestFidias(t *testing.T) {
 	opt.WaitBallot = true
 	opt.WaitApply = true
 	opt.WaitApplyTimeout = 1000
-	err = ts1.fids.hexlog.ProposeEntry(entry, opt)
+	err = ts1.fids.hexlog.ProposeEntry(entry, opt, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
