@@ -1,86 +1,57 @@
 package fidias
 
 import (
-	"io/ioutil"
-	"time"
+	"crypto/sha256"
+	"hash"
 
-	yaml "gopkg.in/yaml.v1"
-
-	"github.com/hexablock/go-chord"
+	"github.com/hashicorp/memberlist"
+	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexaring"
-	"github.com/hexablock/hexatype"
 )
 
-// Config hold the guac config along with the underlying log and ring config
+// Config is the fidias config
 type Config struct {
-	// This is internally set on bootstrap
-	Version string
-	// Chord ring config
-	Ring *chord.Config
-	// Hexalog config
-	Hexalog *hexalog.Config
-	// Relocate request buffer size
-	RelocateBufSize int
-	// Interval to wait before retrying a proposal
-	RetryInterval time.Duration
+	// KV prefix for the WAL
+	KVPrefix string
 
-	// Threshold after ring event to consider we are stable
-	//StableThreshold time.Duration
+	// Default block replicas
+	Replicas int
 
-	// Web UI directory
-	UIDir string
-	// Hexalog key namespaces
-	Namespaces *NSConfig
+	// Data directory
+	DataDir string
+
+	// Any existing peers. This will automatically cause the node to join the
+	// cluster
+	Peers []string
+
+	Memberlist *memberlist.Config
+	Hexalog    *hexalog.Config
+	DHT        *kelips.Config
 }
 
-// NSConfig holds a namespace config
-type NSConfig struct {
-	// Hexalog namespace for key value pairs
-	KeyValue string
-	// Hexalog namespace for filesystem paths
-	FileSystem string
+// HashFunc returns the hash function used for the fidias as a whole.  These
+// will always match between the the dht, blox and hexalog
+func (config *Config) HashFunc() hash.Hash {
+	return config.Hexalog.Hasher()
 }
 
-// Hostname returns the configured hostname. The assumption here is the log and ring
-// hostnames are the same as they should be checked and set prior to using this call
-func (conf *Config) Hostname() string {
-	return conf.Ring.Hostname
+// SetHashFunc sets the hash function for hexalog and the dht
+func (config *Config) SetHashFunc(hf func() hash.Hash) {
+	config.Hexalog.Hasher = hf
+	config.DHT.HashFunc = hf
 }
 
-// Hasher returns the log hasher.  This is a helper function
-func (conf *Config) Hasher() hexatype.Hasher {
-	return conf.Hexalog.Hasher
-}
-
-// LoadConfig loads a yaml config from a file
-func LoadConfig(filename string) (*Config, error) {
-	b, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
+// DefaultConfig returns a minimally required config
+func DefaultConfig() *Config {
+	conf := &Config{
+		Replicas: 2,
+		KVPrefix: "kv/",
+		Peers:    []string{},
+		Hexalog:  hexalog.DefaultConfig(""),
+		DHT:      kelips.DefaultConfig(""),
 	}
-	cfg := &Config{}
-	if err = yaml.Unmarshal(b, cfg); err != nil {
-		return nil, err
-	}
+	conf.Hexalog.Votes = 2
+	conf.SetHashFunc(sha256.New)
 
-	return cfg, err
-}
-
-// DefaultConfig returns a default sane config setting the hostname on the log and ring
-// configs
-func DefaultConfig(hostname string) *Config {
-	cfg := &Config{
-		RelocateBufSize: 64,
-		Ring:            hexaring.DefaultConfig(hostname),
-		Hexalog:         hexalog.DefaultConfig(hostname),
-		//StableThreshold: 5 * time.Minute,
-		RetryInterval: 10 * time.Millisecond,
-		Namespaces: &NSConfig{
-			KeyValue:   "keyvs/",
-			FileSystem: "fs/",
-		},
-	}
-
-	return cfg
+	return conf
 }

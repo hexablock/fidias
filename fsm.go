@@ -1,53 +1,68 @@
 package fidias
 
 import (
+	"bytes"
 	"fmt"
-	"log"
 
+	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/log"
 )
 
 const (
 	// OpSet is the op to set a ke-value pair
-	OpSet byte = iota + 1
+	opKVSet byte = iota + 1
 	// OpDel is the op to delete a key-value pair
-	OpDel
+	opKVDel
 )
 
-// KeyValueFSM is an FSM for a key value store.  Aside from fsm functions,
-// it also contains read-only key-value functions needed.
-type KeyValueFSM interface {
+// KVStore is the kv store used by the FSM to perform write operations
+type KVStore interface {
 	// Get a key
-	Get(key []byte) (*KeyValuePair, error)
-	// Apply a set operation entry with value containing the data
-	ApplySet(entryID []byte, entry *hexalog.Entry, value []byte) error
-	// Apply a delete entry
-	ApplyDelete(entry *hexalog.Entry) error
+	Get(key []byte) (*KVPair, error)
+
+	// Set a key.  Called by the fsm.  It returns any directory keys that may
+	// have been implicitly created
+	Set(kvp *KVPair) ([]*KVPair, error)
+
+	// Delete a key.  Called by the fsm
+	Remove(key []byte) error
+
+	// Iterate over kv's starting at the prefix.  If recurse is true then all
+	// keys in subdirs are also returned
+	Iter(prefix []byte, recurse bool, f func(kv *KVPair) bool)
 }
 
 // FSM is a hexalog FSM for an in-memory key-value store.  It implements the
 // FSM interface and provides a get function to retrieve keys as all write
 // are handled by the FSM
 type FSM struct {
-	kv KeyValueFSM // FSM for key-value pairs
+	// Hexalog entry prefix for kv's
+	kvprefix []byte
+
+	// Local host DHT address
+	localTuple kelips.TupleHost
+
+	// Actual kvstore
+	kvs KVStore
+
+	// DHT
+	dht DHT
 }
 
-// NewFSM inits a new FSM
-func NewFSM(kvprefix, fsprefix string) *FSM {
+// NewFSM inits a new FSM. localTuple is the local host port tuple for the dht
+func NewFSM(kvprefix string, localTuple kelips.TupleHost, kvs KVStore) *FSM {
 	return &FSM{
-		kv: NewInMemKeyValueFSM(kvprefix),
+		kvprefix:   []byte(kvprefix),
+		localTuple: localTuple,
+		kvs:        kvs,
 	}
 }
 
-// Open initialized the internal data structures.  It always returns nil
-func (fsm *FSM) Open() error {
-	return nil
-}
-
-// GetKey gets a value for the key.  It reads it directly from the stored log
-// entry
-func (fsm *FSM) GetKey(key []byte) (*KeyValuePair, error) {
-	return fsm.kv.Get(key)
+// RegisterDHT registers the dht to the state machine.  THis is to allow inserts
+// to the dht when keys log entries are applied
+func (fsm *FSM) RegisterDHT(dht DHT) {
+	fsm.dht = dht
 }
 
 // Apply applies the given entry to the FSM.  entryID is the hash id of the
@@ -55,7 +70,7 @@ func (fsm *FSM) GetKey(key []byte) (*KeyValuePair, error) {
 // followed by the actual value.
 func (fsm *FSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	if entry.Data == nil || len(entry.Data) == 0 {
-		log.Printf("[WARNING] Hexalog entry data missing key=%s", entry.Key)
+		log.Printf("[WARNING] Hexalog entry has no data key=%s", entry.Key)
 		return nil
 	}
 
@@ -65,11 +80,11 @@ func (fsm *FSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	)
 
 	switch op {
-	case OpSet:
-		resp = fsm.kv.ApplySet(entryID, entry, entry.Data[1:])
+	case opKVSet:
+		resp = fsm.applyKVSet(entryID, entry, entry.Data[1:])
 
-	case OpDel:
-		resp = fsm.kv.ApplyDelete(entry)
+	case opKVDel:
+		resp = fsm.applyKVDelete(entry)
 
 	default:
 		resp = fmt.Errorf("invalid operation: %x", op)
@@ -79,7 +94,46 @@ func (fsm *FSM) Apply(entryID []byte, entry *hexalog.Entry) interface{} {
 	return resp
 }
 
-// Close is a no-op to satisfy the KeyValueFSM interface
-func (fsm *FSM) Close() error {
-	return nil
+func (fsm *FSM) applyKVSet(entryID []byte, entry *hexalog.Entry, value []byte) error {
+	kv := &KVPair{
+		Key:          bytes.TrimPrefix(entry.Key, fsm.kvprefix),
+		Value:        value,
+		Modification: entryID,
+		ModTime:      entry.Timestamp,
+		LTime:        entry.LTime,
+		Height:       entry.Height,
+	}
+
+	createdDirs, err := fsm.kvs.Set(kv)
+	if err != nil {
+		return err
+	}
+
+	// Insert key to dht
+	if err = fsm.dht.Insert(kv.Key, fsm.localTuple); err != nil {
+		log.Println("[ERROR] FSM dht insert failed:", err)
+	}
+
+	// Insert any directories created to dht
+	for _, c := range createdDirs {
+		if er := fsm.dht.Insert(c.Key, fsm.localTuple); er != nil {
+			log.Println("[ERROR] FSM dht insert failed:", er)
+			err = er
+		}
+	}
+
+	log.Printf("[DEBUG] FSM key=%s dirs-created=%d height=%d error='%v'",
+		kv.Key, len(createdDirs), kv.Height, err)
+
+	return err
+}
+
+// ApplyDelete applies a hexalog delete operation entry to the fsm
+func (fsm *FSM) applyKVDelete(entry *hexalog.Entry) error {
+	key := bytes.TrimPrefix(entry.Key, fsm.kvprefix)
+	err := fsm.kvs.Remove(key)
+	if err == nil {
+		err = fsm.dht.Delete(key)
+	}
+	return err
 }

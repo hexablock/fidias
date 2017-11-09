@@ -4,31 +4,32 @@ package fidias;
 
 service FidiasRPC {
     // Get key-value pair from remote
-    rpc GetKeyRPC(KeyValuePair) returns (KeyValuePair) {}
-    // Send key-location id pairs
-    rpc RelocateRPC(stream KeyState) returns (stream KeyState) {}
-    // Send block id and journal value
-    rpc RelocateBlocksRPC(stream KeyState) returns (stream KeyState) {}
+    rpc GetKeyRPC(KVPair) returns (KVPair) {}
+
+    // List directory contens for this node
+    rpc ListDirRPC(KVPair) returns (stream KVPair) {}
 }
 
-message KeyState {
-    // Actual key
+message KVPair {
     bytes Key = 1;
-    // Location id or last entry or id
-    bytes Marker = 2;
-    // Total known height of the key
-    uint32 Height = 3;
-}
 
-
-message KeyValuePair {
-    bytes Key = 1;
     // Arbitrary data
     bytes Value = 2;
+
     // Artibrary integer flags
     int64 Flags = 3;
-    // Entry id resulting in the view
-    bytes Modification = 4;
-    // Entry height
-    uint32 Height = 5;
+
+    // Lamport time
+    uint64 LTime = 4;
+
+    // Modification time
+    uint64 ModTime = 5;
+
+    // Entry id resulting in the view.  If a directory is created then the dir
+    // entry will also for  the same modification id as such directories will
+    // have different values based on their view
+    bytes Modification = 6;
+
+    // Entry height creating this view
+    uint32 Height = 7;
 }

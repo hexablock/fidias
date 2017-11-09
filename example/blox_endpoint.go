@@ -1,14 +1,13 @@
-package gateways
+package main
 
 import (
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 
+	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
-	"github.com/hexablock/blox/filesystem"
 )
 
 // Reference: https://stackoverflow.com/questions/2419281/content-length-header-versus-chunked-encoding
@@ -33,7 +32,7 @@ import (
 // download faster thanks to gzip).
 //
 
-func (server *HTTPServer) handleBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
+func (server *httpServer) handleBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
 	var err error
 
 	switch r.Method {
@@ -48,72 +47,65 @@ func (server *HTTPServer) handleBlox(w http.ResponseWriter, r *http.Request, res
 		return
 	}
 
+	// catch all
 	if err != nil {
+		writeJSONResponse(w, 400, map[string]string{}, nil, err)
 		log.Printf("[ERROR] Blox operation failed: %v", err)
 	}
 
 }
 
-func (server *HTTPServer) handlerBloxGet(w http.ResponseWriter, resourceID string) error {
+func (server *httpServer) handlerBloxGet(w http.ResponseWriter, resourceID string) error {
 	id, err := hex.DecodeString(resourceID)
 	if err != nil {
-		writeJSONResponse(w, 400, map[string]string{}, nil, err)
 		return err
 	}
 
-	var fh *filesystem.BloxFile
-	if fh, err = server.fs.Open(id); err != nil {
-		var headers map[string]string
-		if err == block.ErrBlockNotFound {
-			writeJSONResponse(w, 404, headers, nil, err)
-		} else {
-			writeJSONResponse(w, 400, headers, nil, err)
-		}
+	asm := blox.NewAssembler(server.dev, 3)
+	idx, err := asm.SetRoot(id)
+	if err != nil {
 		return err
 	}
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", idx.FileSize()))
+	w.Header().Set(headerBlockSize, fmt.Sprintf("%d", idx.BlockSize()))
+	w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))
+	w.Header().Set(headerBlockCount, fmt.Sprintf("%d", idx.BlockCount()))
 
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fh.Size()))
-	w.Header().Set(headerBlockSize, fmt.Sprintf("%d", fh.BlockSize()))
+	//  Cannot send an error
+	if err = asm.Assemble(w); err != nil {
+		log.Println("[ERROR]", err)
+	}
 
-	_, err = io.Copy(w, fh)
-	fh.Close()
-
-	return err
+	return nil
 }
 
-func (server *HTTPServer) handlerBloxPost(w http.ResponseWriter, r *http.Request) error {
+func (server *httpServer) handlerBloxPost(w http.ResponseWriter, r *http.Request) error {
 	headers := map[string]string{}
 
-	fh, err := server.fs.Create()
+	sharder := blox.NewStreamSharder(server.dev, 3)
+	err := sharder.Shard(r.Body)
 	if err != nil {
-		writeJSONResponse(w, 400, headers, nil, err)
-		return err
-	}
-
-	_, err = io.Copy(fh, r.Body)
-	defer r.Body.Close()
-
-	if err != nil {
-		writeJSONResponse(w, 400, headers, nil, err)
 		return err
 	}
 
 	// Final response after upload completes assuming there are no errors
 	code := 201
 
-	if err = fh.Close(); err == block.ErrBlockExists {
-		err = nil
-		// The server has fulfilled a request for the resource, and the response is a
-		// representation of the result of one or more instance-manipulations applied
-		// to the current instance
-		code = 226
+	headers[headerBlockWriteTime] = fmt.Sprintf("%v", sharder.Runtime())
+
+	data := sharder.IndexBlock()
+	if _, err = server.dev.SetBlock(data); err != nil {
+
+		if err == block.ErrBlockExists {
+			// The server has fulfilled a request for the resource, and the response
+			// is a representation of the result of one or more instance
+			// manipulations applied to the current instance
+			code = 226
+			err = nil
+		}
+
 	}
 
-	data := fh.Sys()
-	rt := fh.Runtime()
-	headers[headerRuntime] = fmt.Sprintf("%v", rt)
-	headers[headerBlockSize] = fmt.Sprintf("%d", fh.BlockSize())
 	writeJSONResponse(w, code, headers, data, err)
-
-	return err
+	return nil
 }

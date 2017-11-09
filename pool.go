@@ -26,7 +26,11 @@ type outPool struct {
 }
 
 func newOutPool(maxIdle, reapInterval time.Duration) *outPool {
-	return &outPool{pool: make(map[string]*rpcOutConn)}
+	return &outPool{
+		maxConnIdle:  maxIdle,
+		reapInterval: reapInterval,
+		pool:         make(map[string]*rpcOutConn),
+	}
 }
 
 func (pool *outPool) returnConn(o *rpcOutConn) {

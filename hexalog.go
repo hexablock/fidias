@@ -1,142 +1,180 @@
 package fidias
 
 import (
-	"io"
+	"context"
+	"hash"
 	"time"
 
-	"github.com/hexablock/go-chord"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/log"
 )
 
-// Hexalog is a ring/cluster aware Hexalog.
-type Hexalog struct {
-	conf     *hexalog.Config        // Hexalog config
-	retryInt time.Duration          // Proposal retry interval
-	hexlog   *hexalog.Hexalog       // Hexalog instance
-	trans    *localHexalogTransport // Hexalog local and remote transport
+// Jury implements an interface to get participants for an entry proposal. These
+// are the peers participating in the voting process
+type Jury interface {
+	Participants(key []byte, min int) ([]*hexalog.Participant, error)
+}
 
-	dht DHT
+// Hexalog is a network aware Hexalog.  It implements selecting the
+// participants from the network for consistency
+type Hexalog struct {
+	// Hexalog config
+	//	conf *hexalog.Config
+	hashFunc func() hash.Hash
+	minVotes int
+	// Hexalog store
+	//store *hexalog.LogStore
+
+	// Hexalog instance
+	//hexlog *hexalog.Hexalog
+
+	// Unified local/remote transport
+	//trans *localHexalogTransport
+	//trans hexalog.Transport
+	trans WALTransport
+
+	// Jury selector for voting rounds
+	jury Jury
+
+	//fsm *FSM
 }
 
 // NewHexalog inits a new fidias hexalog instance attached to the ring.  Remote must
 // be registered to grpc before init'ing hexalog
-func NewHexalog(conf *Config, logstore *hexalog.LogStore, stable hexalog.StableStore, f *FSM, remote *hexalog.NetTransport) (*Hexalog, error) {
-	// Init FSM
-	var fsm *FSM
-	if f == nil {
-		fsm = NewFSM(conf.Namespaces.KeyValue, conf.Namespaces.FileSystem)
-	} else {
-		fsm = f
-	}
-	// Make it available for use
-	if err := fsm.Open(); err != nil {
-		return nil, err
-	}
+func NewHexalog(minVotes int, hf func() hash.Hash, trans WALTransport) (*Hexalog, error) {
+	// if conf.Hostname == "" {
+	// 	return nil, fmt.Errorf("missing hostname")
+	// }
 
-	retryInt := 10 * time.Millisecond
+	// logstore := hexalog.NewLogStore(entries, index, conf.Hasher)
+	// hexlog, err := hexalog.NewHexalog(conf, fsm, entries, index, stable, trans)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	hexlog, err := hexalog.NewHexalog(conf.Hexalog, fsm, logstore, stable, remote)
-	if err != nil {
-		return nil, err
-	}
-
-	trans := &localHexalogTransport{
-		host:   conf.Hostname(),
-		hexlog: hexlog,
-		store:  logstore,
-		remote: remote,
-	}
-
-	hexl := &Hexalog{
-		conf:     conf.Hexalog,
-		hexlog:   hexlog,
-		retryInt: retryInt,
+	hxl := &Hexalog{
+		minVotes: minVotes,
+		hashFunc: hf,
 		trans:    trans,
+		//conf:  conf,
+		//fsm:    fsm,
+		//store:  logstore,
+		//	hexlog: hexlog,
 	}
 
-	return hexl, nil
+	// hxl.trans = &localHexalogTransport{
+	// 	host:   conf.Hostname,
+	// 	hexlog: hexlog,
+	// 	store:  logstore,
+	// 	remote: remote,
+	// }
+
+	return hxl, nil
 }
 
-// RegisterDHT registers the DHT to hexalog
-func (hexlog *Hexalog) RegisterDHT(dht DHT) {
-	hexlog.dht = dht
-}
+// RegisterJury registers a jury to get participants for a consensus round
+// func (hexlog *Hexalog) RegisterJury(jury Jury) {
+// 	hexlog.jury = jury
+// }
 
-// MinVotes returns the minimum number of required votes for a proposal and commit
-func (hexlog *Hexalog) MinVotes() int {
-	return hexlog.conf.Votes
-}
+// Seed seeds data from an exiting host.  This is to be called before beginning
+// the use of the log to ensure consistency with the network. It takes a buffer
+// size and number of parallel seedings
+// func (hexlog *Hexalog) Seed(existing string, bufsize, parallel int) error {
+// 	log.Println("[INFO] Seeding from", existing)
+// 	err := hexlog.hexlog.Seed(existing, bufsize, parallel)
+// 	return err
+// }
 
-// NewEntry returns a new Entry for the given key from Hexalog.  It returns an error if
-// the node is not part of the location set or a lookup error occurs
-func (hexlog *Hexalog) NewEntry(key []byte) (*hexalog.Entry, *hexalog.RequestOptions, error) {
-	// Lookup locations for this key
-	locs, err := hexlog.dht.LookupReplicated(key, hexlog.MinVotes())
+// NewEntry returns a new Entry for the given key from Hexalog.  It returns an
+// error if the node is not part of the location set or a lookup error occurs
+func (hexlog *Hexalog) NewEntry(key []byte) (*hexalog.Entry, []*hexalog.Participant, error) {
+	peers, err := hexlog.jury.Participants(key, hexlog.minVotes)
 	if err != nil {
 		return nil, nil, err
 	}
-	opt := hexalog.DefaultRequestOptions()
-	opt.PeerSet = locationsToParticipants(locs)
-	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
-	// 	return nil, opt, err
-	// }
 
+	opt := &hexalog.RequestOptions{}
 	var entry *hexalog.Entry
-	for i, loc := range locs {
-		if entry, err = hexlog.trans.NewEntry(loc.Host(), key); err == nil {
-			opt.SourceIndex = int32(i)
-			return entry, opt, nil
+
+	for _, loc := range peers {
+		if entry, err = hexlog.trans.NewEntry(loc.Host, key, opt); err == nil {
+			return entry, peers, nil
 		}
 	}
 
-	return nil, opt, err
+	return nil, peers, err
 }
 
 // NewEntryFrom creates a new entry based on the given entry.  It uses the
 // given height and previous hash of the entry to determine the values for
 // the new entry.  This is essentially a compare and set
-func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, *hexalog.RequestOptions, error) {
-
-	// Lookup locations for this key
-	locs, err := hexlog.dht.LookupReplicated(entry.Key, hexlog.MinVotes())
+func (hexlog *Hexalog) NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, []*hexalog.Participant, error) {
+	peers, err := hexlog.jury.Participants(entry.Key, hexlog.minVotes)
 	if err != nil {
 		return nil, nil, err
 	}
-	opt := hexalog.DefaultRequestOptions()
-	opt.PeerSet = locationsToParticipants(locs)
-	//opt := &hexatype.RequestOptions{SourceIndex: 0, PeerSet: locs}
-	// if _, err := locs.GetByHost(hexlog.conf.Hostname); err != nil {
-	// 	return nil, opt, err
-	// }
 
 	nentry := &hexalog.Entry{
 		Key:       entry.Key,
-		Previous:  entry.Hash(hexlog.conf.Hasher.New()),
+		Previous:  entry.Hash(hexlog.hashFunc()),
 		Height:    entry.Height + 1,
 		Timestamp: uint64(time.Now().UnixNano()),
 	}
 
-	return nentry, opt, nil
+	return nentry, peers, nil
 }
 
-// ProposeEntry finds locations for the entry and proposes it to those locations.  It retries
-// the specified number of times before returning.  It returns a ballot that can be waited on
-// for the entry to be applied or an error
-func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions, retries int) (err error) {
-	//log.Printf("[DEBUG] Proposal peer set %s", hexaring.LocationSet(opts.PeerSet))
-	//retries := int(opts.Retries)
+// GetEntry tries to get an entry from the network from all known locations
+func (hexlog *Hexalog) GetEntry(key, id []byte) (*hexalog.Entry, error) {
+	peers, err := hexlog.jury.Participants(key, hexlog.minVotes)
+	if err != nil {
+		return nil, err
+	}
+
+	opt := &hexalog.RequestOptions{}
+
+	for _, p := range peers {
+		ent, er := hexlog.trans.GetEntry(p.Host, key, id, opt)
+		if er == nil {
+			return ent, nil
+		}
+		err = er
+	}
+
+	return nil, err
+}
+
+// ProposeEntry finds locations for the entry and proposes it to those locations
+// It retries the specified number of times before returning.  It returns a an
+// entry id on success and error otherwise
+func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions, retries int, retryInt time.Duration) (eid []byte, stats *WriteStats, err error) {
 	if retries < 1 {
 		retries = 1
 	}
 
+	if retryInt == 0 {
+		retryInt = 30 * time.Millisecond
+	}
+
+	log.Printf("[DEBUG] Proposing key=%s participants=%d", entry.Key, len(opts.PeerSet))
+
 	for i := 0; i < retries; i++ {
 		// Propose with retries.  Retry only on a ErrPreviousHash error
-		//if ballot, err = hexlog.hexlog.Propose(entry, opts); err == nil {
-		if err = hexlog.trans.ProposeEntry(opts.PeerSet[0].Host, entry, opts); err == nil {
+		var resp *hexalog.ReqResp
+		if resp, err = hexlog.trans.ProposeEntry(context.Background(), opts.PeerSet[0].Host, entry, opts); err == nil {
+
+			eid = entry.Hash(hexlog.hashFunc())
+			stats = &WriteStats{
+				BallotTime:   time.Duration(resp.BallotTime),
+				ApplyTime:    time.Duration(resp.ApplyTime),
+				Participants: opts.PeerSet,
+			}
 			return
+
 		} else if err == hexatype.ErrPreviousHash {
-			time.Sleep(hexlog.retryInt)
+			time.Sleep(retryInt)
 		} else {
 			return
 		}
@@ -144,45 +182,4 @@ func (hexlog *Hexalog) ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestO
 	}
 
 	return
-}
-
-// GetEntry tries to get an entry from the ring.  It gets the replica locations and queries
-// upto the max allowed successors for each location.
-func (hexlog *Hexalog) GetEntry(key, id []byte) (entry *hexalog.Entry, meta *ReMeta, err error) {
-	meta = &ReMeta{}
-	_, err = hexlog.dht.ScourReplicatedKey(key, hexlog.MinVotes(), func(vn *chord.Vnode) error {
-		ent, er := hexlog.trans.GetEntry(vn.Host, key, id)
-		if er == nil {
-			entry = ent
-			meta.Vnode = vn
-			return io.EOF
-		}
-
-		return nil
-	})
-
-	// We found the entry.
-	if err == io.EOF {
-		err = nil
-	} else if entry == nil {
-		err = hexatype.ErrEntryNotFound
-	}
-
-	return
-}
-
-// Leader returns the leader of the given location set from the underlying log.
-func (hexlog *Hexalog) Leader(key []byte, locs []*hexalog.Participant) (*hexalog.KeyLeader, error) {
-	return hexlog.hexlog.Leader(key, locs)
-}
-
-// Heal submits a heal request for the given key to the local note.  It consults the supplied
-// PeerSet in order to perform the heal.
-func (hexlog *Hexalog) Heal(key []byte, opts *hexalog.RequestOptions) error {
-	return hexlog.hexlog.Heal(key, opts)
-}
-
-// Stats returns the overall log stats
-func (hexlog *Hexalog) Stats() *hexalog.Stats {
-	return hexlog.hexlog.Stats()
 }

@@ -1,114 +1,300 @@
 package fidias
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"net"
+	"os"
+	"path/filepath"
+	"time"
 
-	"github.com/hexablock/go-chord"
-	"github.com/hexablock/hexaring"
+	"google.golang.org/grpc"
+
+	"github.com/hashicorp/memberlist"
+	"github.com/hexablock/blox"
+	"github.com/hexablock/blox/device"
+	"github.com/hexablock/go-kelips"
+	hexaboltdb "github.com/hexablock/hexa-boltdb"
+	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexatype"
+	"github.com/hexablock/vivaldi"
 )
 
-// DHT implements lookups against a distributed hash table
+// DHT implements a distributed hash table needed to route keys
 type DHT interface {
-	LookupReplicated(key []byte, replicas int) (hexaring.LocationSet, error)
-	LookupReplicatedHash(hash []byte, replicas int) (hexaring.LocationSet, error)
-	ScourReplicatedKey(key []byte, replicas int, cb func(*chord.Vnode) error) (int, error)
+	LookupGroupNodes(key []byte) ([]*hexatype.Node, error)
+	Lookup(key []byte) ([]*hexatype.Node, error)
+	Insert(key []byte, tuple kelips.TupleHost) error
+	Delete(key []byte) error
 }
 
-// ReMeta contains metadata associated to a request or response
-type ReMeta struct {
-	Vnode   *chord.Vnode         // vnode processing the request or response
-	PeerSet hexaring.LocationSet // set of peers involved
+// WALTransport implements an interface for network log operations
+type WALTransport interface {
+	NewEntry(host string, key []byte, opts *hexalog.RequestOptions) (*hexalog.Entry, error)
+	ProposeEntry(ctx context.Context, host string, entry *hexalog.Entry, opts *hexalog.RequestOptions) (*hexalog.ReqResp, error)
+	GetEntry(host string, key []byte, id []byte, opts *hexalog.RequestOptions) (*hexalog.Entry, error)
 }
 
-// Fidias is the core that manages all operations for a node.  It primary manages
-// rebalancing, replication, and appropriately deals with cluster churn.
+// WAL implements an interface to provide p2p distributed consensus
+type WAL interface {
+	NewEntry(key []byte) (*hexalog.Entry, []*hexalog.Participant, error)
+	NewEntryFrom(entry *hexalog.Entry) (*hexalog.Entry, []*hexalog.Participant, error)
+	ProposeEntry(entry *hexalog.Entry, opts *hexalog.RequestOptions, retries int, retryInt time.Duration) ([]byte, *WriteStats, error)
+	GetEntry(key []byte, id []byte) (*hexalog.Entry, error)
+}
+
+// Fidias is core engine for a cluster member/participant it runs a server and
+// client components
 type Fidias struct {
-	// Configuration
 	conf *Config
-	// Underlying ring
-	ring *hexaring.Ring
-	// Ring backed hexalog
-	hexlog *Hexalog
-	// FSM for both keyvs and the file-system
-	fsm *FSM
-	// Key-value interface
-	keyvs *Keyvs
-	// Ring backed BlockDevice
-	dev *RingDevice
-	// Blocks of keys this node is responsible for. These are the local vnodes and
-	// their respective predecessors
-	keyblocks *keyBlockSet
-	// Relocation engine to send keys to be relocated
-	rel *Relocator
-	// Fetcher used for log entry fetching
-	fet *Fetcher
-	// Channel to signal shutdown
-	shutdown chan struct{}
+
+	// Local node
+	local hexatype.Node
+
+	// Lamport clock
+	ltime *hexatype.LamportClock
+
+	// Virtual coorinates
+	coord *vivaldi.Client
+
+	// DHT
+	dht *kelips.Kelips
+
+	// Gossip delegate
+	dlg *delegate
+
+	// Gossip
+	memberlist *memberlist.Memberlist
+
+	// KV API
+	kvs *KVS
+
+	// Block device for blox API
+	dev *BlockDevice
+
+	// Actual kv store
+	kvstore KVStore
+
+	grpc *grpc.Server
+
+	hexalog *Hexalog
 }
 
-// New instantiates a new instance of Fidias based on the given config and stores along with
-// a grpc server instance to register the network transports
-func New(conf *Config, hexlog *Hexalog, fsm *FSM, relocator *Relocator, fetcher *Fetcher,
-	keyvs *Keyvs, dev *RingDevice, trans *NetTransport) *Fidias {
-
-	fids := &Fidias{
-		conf:      conf,
-		hexlog:    hexlog,
-		fsm:       fsm,
-		keyvs:     keyvs,
-		dev:       dev,
-		keyblocks: newKeyBlockSet(),
-		rel:       relocator,
-		fet:       fetcher,
-		shutdown:  make(chan struct{}, 1), // For relocator
+// Create creates a new fidias instance.  It inits the local node, gossip layer
+// and associated delegates
+func Create(conf *Config) (*Fidias, error) {
+	// Coorinate client
+	coord, err := vivaldi.NewClient(vivaldi.DefaultConfig())
+	if err != nil {
+		return nil, err
 	}
 
-	// Register hexalog network transport to fetcher
-	fids.fet.RegisterTransport(hexlog.trans.remote)
-
-	// Register hexalog healer to fetcher
-	fids.fet.RegisterHealer(hexlog)
-
-	// Register fetch channels to fidias network transport
-	trans.Register(fetcher.fetCh, fetcher.blkCh)
-
-	// Register fidias transport to relocator
-	fids.rel.RegisterTransport(trans)
-
-	// Register keyvs transport
-	fids.keyvs.RegisterTransport(trans)
-
-	// Set self as the chord delegate
-	conf.Ring.Delegate = fids
-
-	return fids
-}
-
-// Register registers the chord ring to fidias.  This is due to the fact that guac and the
-// ring depend on each other and the ring may not be intialized yet.  Only upon ring
-// registration, the rebalancing is started.
-func (fids *Fidias) Register(ring *hexaring.Ring) {
-	fids.ring = ring
-
-	// Register dht to hexalog
-	fids.hexlog.RegisterDHT(ring)
-	// Register dht to key-value
-	fids.keyvs.RegisterDHT(ring)
-
-	// Register dht to storage device if enabled.  Only init FS is device is initialized
-	if fids.dev != nil {
-
-		fids.dev.RegisterDHT(ring)
-
-		log.Printf("[INFO] FileSystem initialization complete")
+	fid := &Fidias{
+		conf:    conf,
+		ltime:   &hexatype.LamportClock{},
+		kvstore: NewInmemKVStore(),
+		coord:   coord,
+		grpc:    grpc.NewServer(),
 	}
 
-	// Register dht to fetcher
-	fids.fet.RegisterDHT(ring)
+	// The order of initialization is important
 
-	log.Println("[INFO] Fidias intializied")
+	if err = fid.initDHT(); err != nil {
+		return nil, err
+	}
+
+	if err = fid.initBlockDevice(); err != nil {
+		return nil, err
+	}
+
+	if err = fid.initHexalog(); err != nil {
+		return nil, err
+	}
+
+	fid.initKVS()
+
+	fid.init()
+
+	if err = fid.startGrpc(); err != nil {
+		return nil, err
+	}
+
+	fid.memberlist, err = memberlist.Create(conf.Memberlist)
+
+	return fid, err
 }
 
-func (fids *Fidias) shutdownWait() {
-	fids.fet.stop()
+func (fidias *Fidias) init() {
+
+	fidias.dlg = &delegate{
+		local:      fidias.local,
+		coord:      fidias.coord,
+		dht:        fidias.dht,
+		broadcasts: make([][]byte, 0),
+	}
+
+	//
+	c := fidias.conf.Memberlist
+	c.Delegate = fidias.dlg
+	c.Ping = fidias
+	c.Events = fidias.dlg
+	c.Alive = fidias.dlg
+	c.Conflict = fidias.dlg
+}
+
+func (fidias *Fidias) initDHT() error {
+	udpAddr, err := net.ResolveUDPAddr("udp", fidias.conf.DHT.Hostname)
+	if err != nil {
+		return err
+	}
+
+	ln, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return err
+	}
+
+	remote := kelips.NewUDPTransport(ln)
+	fidias.dht = kelips.Create(fidias.conf.DHT, remote)
+	fidias.local = fidias.dht.LocalNode()
+
+	return nil
+}
+
+// must be called after dht is init'd
+func (fidias *Fidias) initBlockDevice() error {
+	ln, err := net.Listen("tcp", fidias.conf.DHT.Hostname)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Join(fidias.conf.DataDir, "block")
+	os.MkdirAll(dir, 0755)
+	// Local
+	index := device.NewInmemIndex()
+	raw, err := device.NewFileRawDevice(fidias.conf.DataDir, fidias.conf.HashFunc)
+	if err != nil {
+		return err
+	}
+	dev := device.NewBlockDevice(index, raw)
+	dev.SetDelegate(fidias)
+
+	// Remote
+	opts := blox.DefaultNetClientOptions(fidias.conf.HashFunc)
+	remote := blox.NewNetTransport(opts)
+
+	// Local and remote
+	trans := blox.NewLocalNetTranport(fidias.conf.DHT.Hostname, remote)
+
+	// DHT block device
+	fidias.dev = NewBlockDevice(fidias.conf.Replicas, fidias.conf.HashFunc, trans)
+	fidias.dev.Register(dev)
+	fidias.dev.RegisterDHT(fidias.dht)
+
+	err = trans.Start(ln.(*net.TCPListener))
+	return err
+}
+
+func (fidias *Fidias) initHexalog() error {
+
+	edir := filepath.Join(fidias.conf.DataDir, "log", "entry")
+	os.MkdirAll(edir, 0755)
+	entries := hexaboltdb.NewEntryStore()
+	if err := entries.Open(edir); err != nil {
+		return err
+	}
+
+	edir = filepath.Join(fidias.conf.DataDir, "log", "index")
+	os.MkdirAll(edir, 0755)
+	index := hexaboltdb.NewIndexStore()
+	if err := index.Open(edir); err != nil {
+		return err
+	}
+
+	//entries := hexalog.NewInMemEntryStore()
+	//index := hexalog.NewInMemIndexStore()
+
+	stable := &hexalog.InMemStableStore{}
+
+	localTuple := kelips.TupleHost(fidias.local.Address)
+	fsm := NewFSM(fidias.conf.KVPrefix, localTuple, fidias.kvstore)
+	fsm.RegisterDHT(fidias.dht)
+
+	// Network transport
+	hlnet := hexalog.NewNetTransport(30*time.Second, 300*time.Second)
+	hexalog.RegisterHexalogRPCServer(fidias.grpc, hlnet)
+
+	hexlog, err := hexalog.NewHexalog(fidias.conf.Hexalog, fsm, entries, index, stable, hlnet)
+	if err != nil {
+		return err
+	}
+
+	trans := &localHexalogTransport{
+		host:   fidias.conf.Hexalog.Hostname,
+		hexlog: hexlog,
+		remote: hlnet,
+	}
+
+	fidias.hexalog = &Hexalog{
+		hashFunc: fidias.conf.Hexalog.Hasher,
+		minVotes: fidias.conf.Hexalog.Votes,
+		trans:    trans,
+		jury:     &SimpleJury{dht: fidias.dht},
+	}
+
+	return nil
+}
+
+// init kvs.  hexalog needs to be init'd before this
+func (fidias *Fidias) initKVS() {
+	kvnet := NewNetTransport(30*time.Second, 300*time.Second)
+	RegisterFidiasRPCServer(fidias.grpc, kvnet)
+
+	kvtrans := newLocalKVTransport(fidias.conf.Hexalog.Hostname, kvnet)
+	kvtrans.Register(fidias.kvstore)
+
+	fidias.kvs = NewKVS(fidias.conf.KVPrefix, fidias.hexalog, kvtrans, fidias.dht)
+}
+
+func (fidias *Fidias) startGrpc() error {
+	ln, err := net.Listen("tcp", fidias.conf.Hexalog.Hostname)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		if er := fidias.grpc.Serve(ln); er != nil {
+			log.Fatal(er)
+		}
+	}()
+
+	log.Println("[INFO] Fidias started:", ln.Addr().String())
+	return nil
+}
+
+// DHT returns a distributed hash table interface
+func (fidias *Fidias) DHT() DHT {
+	return fidias.dht
+}
+
+// KVS returns the kvs instance
+func (fidias *Fidias) KVS() *KVS {
+	return fidias.kvs
+}
+
+// BlockDevice returns a cluster aware block device
+func (fidias *Fidias) BlockDevice() *BlockDevice {
+	return fidias.dev
+}
+
+// Join joins the gossip networking using an existing node
+func (fidias *Fidias) Join(existing []string) error {
+	//
+	_, err := fidias.memberlist.Join(existing)
+	return err
+}
+
+// Shutdown performs a complete shutdown of all components
+func (fidias *Fidias) Shutdown() error {
+	return fmt.Errorf("TBI")
 }

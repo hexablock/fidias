@@ -1,227 +1,98 @@
 package fidias
 
 import (
+	"context"
 	"io"
-	"log"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/hexablock/blox/device"
-	"github.com/hexablock/go-chord"
-	"github.com/hexablock/hexalog"
-	"github.com/hexablock/hexatype"
+	kelips "github.com/hexablock/go-kelips"
+	"github.com/hexablock/log"
 )
 
-// KeyValueStore implements a key value storage interface.  It is used by the
-// network transport
-type KeyValueStore interface {
-	GetKey(key []byte) (*KeyValuePair, error)
-}
-
-// LocalStore implements all local calls needed by the network transport
-type LocalStore interface {
-	KeyValueStore
-}
-
-type streamBase struct {
-	o    *rpcOutConn // connection to return
-	pool *outPool    // pool to return connection to
-}
-
-// Recycle recycles the stream returning the conn back to the pool
-func (rs *streamBase) Recycle() {
-	rs.pool.returnConn(rs.o)
-}
-
-// RelocateStream is a stream to handle relocating of keys between nodes.
-type RelocateStream struct {
-	// base containing the conn. and conn. pool
-	*streamBase
-	// grpc stream client
-	FidiasRPC_RelocateRPCClient
-}
-
-// RelocateBlocksStream is a stream to handle relocating blocks between nodes.  It is
-// used to push blocks from the local to remote host
-type RelocateBlocksStream struct {
-	// base containing the conn. and conn. pool
-	*streamBase
-	// grpc stream client
-	FidiasRPC_RelocateBlocksRPCClient
-}
-
-// NetTransport implements a network transport needed for fidias
+// NetTransport is the network transport for fidias as a whole
 type NetTransport struct {
-	local LocalStore
-	// hexalog keylog index store
-	idxs hexalog.IndexStore
-	// BlockDevice index/journal
-	journal device.Journal
-	// default replica count
-	replicas int
-	// hash function to use
-	hasher hexatype.Hasher
-	// Incoming relocation requests. i.e. keys this node needs to take over.
-	fetCh chan<- *relocateReq
-	// Incoming block relocation requests
-	fetBlks chan<- *relocateReq
-	// all outbound connections
-	pool     *outPool
-	shutdown int32
+	klp *kelips.Kelips
+
+	kv   KVStore
+	pool *outPool
 }
 
-// NewNetTransport instantiates a new network transport using the given key-value store.
-func NewNetTransport(localStore LocalStore, idx hexalog.IndexStore, journal device.Journal, reapInterval, maxIdle time.Duration, replicas int, hasher hexatype.Hasher) *NetTransport {
-	return &NetTransport{
-		local:    localStore,
-		idxs:     idx,
-		journal:  journal,
-		replicas: replicas,
-		hasher:   hasher,
-		pool:     newOutPool(maxIdle, reapInterval),
+// NewNetTransport inits the outbound connections pool and returns an instance
+// of NetTransport
+func NewNetTransport(reapInterval, maxIdle time.Duration) *NetTransport {
+	trans := &NetTransport{
+		pool: newOutPool(maxIdle, reapInterval),
 	}
+
+	// Start outbound connection pool
+	go trans.pool.reapOld()
+
+	return trans
 }
 
-// Register registers a write channel used for submitting reloc. requests for keylogs and
-// blocks.
-func (trans *NetTransport) Register(fetLogCh, fetBlkCh chan<- *relocateReq) {
-	trans.fetCh = fetLogCh
-	trans.fetBlks = fetBlkCh
+// Register registers a KVStore the transport will use to serve requests
+func (trans *NetTransport) Register(kvs KVStore) {
+	trans.kv = kvs
 }
 
 // GetKey retrieves a key from a remote host
-func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) (*KeyValuePair, error) {
+func (trans *NetTransport) GetKey(ctx context.Context, host string, key []byte) (*KVPair, error) {
 	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	kvp, err := conn.client.GetKeyRPC(ctx, &KeyValuePair{Key: key})
-	if err != nil {
-		err = hexatype.ParseGRPCError(err)
-	}
+	kvp, err := conn.client.GetKeyRPC(ctx, &KVPair{Key: key})
 	trans.pool.returnConn(conn)
 
 	return kvp, err
 }
 
-// GetKeyRPC serves a GetKey request
-func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KeyValuePair) (*KeyValuePair, error) {
-	return trans.local.GetKey(in.Key)
-}
-
-// GetRelocateStream gets a stream to send relocation keys
-func (trans *NetTransport) GetRelocateStream(local, remote *chord.Vnode) (*RelocateStream, error) {
-	conn, err := trans.pool.getConn(remote.Host)
+// ListDir gets the contents of a directory from the host
+func (trans *NetTransport) ListDir(ctx context.Context, host string, dir []byte) ([]*KVPair, error) {
+	conn, err := trans.pool.getConn(host)
 	if err != nil {
 		return nil, err
 	}
 
-	stream, err := conn.client.RelocateRPC(context.Background())
-	if err != nil {
-		return nil, hexatype.ParseGRPCError(err)
-	}
+	stream, err := conn.client.ListDirRPC(context.Background(), &KVPair{Key: dir})
+	defer trans.pool.returnConn(conn)
 
-	preamble := &chord.VnodePair{Self: local, Target: remote}
-	if err = stream.SendMsg(preamble); err != nil {
-		trans.pool.returnConn(conn)
-		return nil, hexatype.ParseGRPCError(err)
-	}
-
-	return &RelocateStream{
-		streamBase:                  &streamBase{o: conn, pool: trans.pool},
-		FidiasRPC_RelocateRPCClient: stream,
-	}, nil
-}
-
-// RelocateRPC serves a GetRelocateStream request stream.  It initiates the process to
-// start taking over the sent keys.
-func (trans *NetTransport) RelocateRPC(stream FidiasRPC_RelocateRPCServer) error {
-
-	var preamble chord.VnodePair
-	if err := stream.RecvMsg(&preamble); err != nil {
-		return err
-	}
-
+	out := make([]*KVPair, 0)
 	for {
-		keyLoc, err := stream.Recv()
-		//	Exit loop on error
-		if err != nil {
-			if err == io.EOF {
-				return nil
+		kvp, er := stream.Recv()
+		if er != nil {
+			if er != io.EOF {
+				err = er
 			}
-			return err
+			break
 		}
+		out = append(out, kvp)
+	}
 
-		// Create key if it does not exist
-		ki, err := trans.idxs.MarkKey(keyLoc.Key, keyLoc.Marker)
-		if err != nil {
-			log.Printf("[ERROR] Failed to mark key=%s error='%v'", keyLoc.Key, err)
-			continue
-		}
-
-		// Only continue relocating the key if the marker was set.  If the marker was not
-		// set it means we already have the marker entry and nothing needs to be done.
-		if ki.Marker() != nil {
-			trans.fetCh <- &relocateReq{keyloc: keyLoc, mems: &preamble}
-		}
-		ki.Close()
-	} // end loop
-
+	return out, err
 }
 
-// GetRelocateBlocksStream gets a stream to send relocation keys
-func (trans *NetTransport) GetRelocateBlocksStream(local, remote *chord.Vnode) (*RelocateBlocksStream, error) {
-	conn, err := trans.pool.getConn(remote.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	stream, err := conn.client.RelocateBlocksRPC(context.Background())
-	if err != nil {
-		return nil, hexatype.ParseGRPCError(err)
-	}
-
-	preamble := &chord.VnodePair{Self: local, Target: remote}
-	if err = stream.SendMsg(preamble); err != nil {
-		trans.pool.returnConn(conn)
-		return nil, hexatype.ParseGRPCError(err)
-	}
-
-	return &RelocateBlocksStream{
-		streamBase:                        &streamBase{o: conn, pool: trans.pool},
-		FidiasRPC_RelocateBlocksRPCClient: stream,
-	}, nil
+// GetKeyRPC serves a get key request performing a local lookup
+func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KVPair) (*KVPair, error) {
+	log.Printf("[DEBUG] NetTransport.GetKeyRPC key=%s", in.Key)
+	return trans.kv.Get(in.Key)
 }
 
-// RelocateBlocksRPC serves a GetRelocateStream request stream.  It initiates the process
-// to start taking over the sent keys.
-func (trans *NetTransport) RelocateBlocksRPC(stream FidiasRPC_RelocateBlocksRPCServer) error {
-
-	var preamble chord.VnodePair
-	if err := stream.RecvMsg(&preamble); err != nil {
-		return err
-	}
-
-	for {
-		keyLoc, err := stream.Recv()
-		//	Exit loop on error
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
+// ListDirRPC serves a list dir request.  It sends all the kv's for a given dir
+func (trans *NetTransport) ListDirRPC(in *KVPair, stream FidiasRPC_ListDirRPCServer) error {
+	var err error
+	trans.kv.Iter(in.Key, false, func(kv *KVPair) bool {
+		if err = stream.Send(kv); err != nil {
+			return false
 		}
+		return true
+	})
 
-		trans.fetBlks <- &relocateReq{keyloc: keyLoc, mems: &preamble}
-
-	} // end loop
-
+	return err
 }
 
-// Shutdown signals the transport to be shutdown.  After shutdown no new connections can
-// be
+// Shutdown shuts the outbound connection pool
 func (trans *NetTransport) Shutdown() {
 	trans.pool.shutdown()
 }

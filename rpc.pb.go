@@ -8,8 +8,7 @@ It is generated from these files:
 	rpc.proto
 
 It has these top-level messages:
-	KeyState
-	KeyValuePair
+	KVPair
 */
 package fidias
 
@@ -33,87 +32,72 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-type KeyState struct {
-	// Actual key
-	Key []byte `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
-	// Location id or last entry or id
-	Marker []byte `protobuf:"bytes,2,opt,name=Marker,proto3" json:"Marker,omitempty"`
-	// Total known height of the key
-	Height uint32 `protobuf:"varint,3,opt,name=Height" json:"Height,omitempty"`
-}
-
-func (m *KeyState) Reset()                    { *m = KeyState{} }
-func (m *KeyState) String() string            { return proto.CompactTextString(m) }
-func (*KeyState) ProtoMessage()               {}
-func (*KeyState) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
-
-func (m *KeyState) GetKey() []byte {
-	if m != nil {
-		return m.Key
-	}
-	return nil
-}
-
-func (m *KeyState) GetMarker() []byte {
-	if m != nil {
-		return m.Marker
-	}
-	return nil
-}
-
-func (m *KeyState) GetHeight() uint32 {
-	if m != nil {
-		return m.Height
-	}
-	return 0
-}
-
-type KeyValuePair struct {
+type KVPair struct {
 	Key []byte `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
 	// Arbitrary data
 	Value []byte `protobuf:"bytes,2,opt,name=Value,proto3" json:"Value,omitempty"`
 	// Artibrary integer flags
 	Flags int64 `protobuf:"varint,3,opt,name=Flags" json:"Flags,omitempty"`
-	// Entry id resulting in the view
-	Modification []byte `protobuf:"bytes,4,opt,name=Modification,proto3" json:"Modification,omitempty"`
-	// Entry height
-	Height uint32 `protobuf:"varint,5,opt,name=Height" json:"Height,omitempty"`
+	// Lamport time
+	LTime uint64 `protobuf:"varint,4,opt,name=LTime" json:"LTime,omitempty"`
+	// Modification time
+	ModTime uint64 `protobuf:"varint,5,opt,name=ModTime" json:"ModTime,omitempty"`
+	// Entry id resulting in the view.  If a directory is created then the dir
+	// entry will also for  the same modification id as such directories will
+	// have different values based on their view
+	Modification []byte `protobuf:"bytes,6,opt,name=Modification,proto3" json:"Modification,omitempty"`
+	// Entry height creating this view
+	Height uint32 `protobuf:"varint,7,opt,name=Height" json:"Height,omitempty"`
 }
 
-func (m *KeyValuePair) Reset()                    { *m = KeyValuePair{} }
-func (m *KeyValuePair) String() string            { return proto.CompactTextString(m) }
-func (*KeyValuePair) ProtoMessage()               {}
-func (*KeyValuePair) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (m *KVPair) Reset()                    { *m = KVPair{} }
+func (m *KVPair) String() string            { return proto.CompactTextString(m) }
+func (*KVPair) ProtoMessage()               {}
+func (*KVPair) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
-func (m *KeyValuePair) GetKey() []byte {
+func (m *KVPair) GetKey() []byte {
 	if m != nil {
 		return m.Key
 	}
 	return nil
 }
 
-func (m *KeyValuePair) GetValue() []byte {
+func (m *KVPair) GetValue() []byte {
 	if m != nil {
 		return m.Value
 	}
 	return nil
 }
 
-func (m *KeyValuePair) GetFlags() int64 {
+func (m *KVPair) GetFlags() int64 {
 	if m != nil {
 		return m.Flags
 	}
 	return 0
 }
 
-func (m *KeyValuePair) GetModification() []byte {
+func (m *KVPair) GetLTime() uint64 {
+	if m != nil {
+		return m.LTime
+	}
+	return 0
+}
+
+func (m *KVPair) GetModTime() uint64 {
+	if m != nil {
+		return m.ModTime
+	}
+	return 0
+}
+
+func (m *KVPair) GetModification() []byte {
 	if m != nil {
 		return m.Modification
 	}
 	return nil
 }
 
-func (m *KeyValuePair) GetHeight() uint32 {
+func (m *KVPair) GetHeight() uint32 {
 	if m != nil {
 		return m.Height
 	}
@@ -121,8 +105,7 @@ func (m *KeyValuePair) GetHeight() uint32 {
 }
 
 func init() {
-	proto.RegisterType((*KeyState)(nil), "fidias.KeyState")
-	proto.RegisterType((*KeyValuePair)(nil), "fidias.KeyValuePair")
+	proto.RegisterType((*KVPair)(nil), "fidias.KVPair")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -137,11 +120,9 @@ const _ = grpc.SupportPackageIsVersion4
 
 type FidiasRPCClient interface {
 	// Get key-value pair from remote
-	GetKeyRPC(ctx context.Context, in *KeyValuePair, opts ...grpc.CallOption) (*KeyValuePair, error)
-	// Send key-location id pairs
-	RelocateRPC(ctx context.Context, opts ...grpc.CallOption) (FidiasRPC_RelocateRPCClient, error)
-	// Send block id and journal value
-	RelocateBlocksRPC(ctx context.Context, opts ...grpc.CallOption) (FidiasRPC_RelocateBlocksRPCClient, error)
+	GetKeyRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (*KVPair, error)
+	// List directory contens for this node
+	ListDirRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (FidiasRPC_ListDirRPCClient, error)
 }
 
 type fidiasRPCClient struct {
@@ -152,8 +133,8 @@ func NewFidiasRPCClient(cc *grpc.ClientConn) FidiasRPCClient {
 	return &fidiasRPCClient{cc}
 }
 
-func (c *fidiasRPCClient) GetKeyRPC(ctx context.Context, in *KeyValuePair, opts ...grpc.CallOption) (*KeyValuePair, error) {
-	out := new(KeyValuePair)
+func (c *fidiasRPCClient) GetKeyRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (*KVPair, error) {
+	out := new(KVPair)
 	err := grpc.Invoke(ctx, "/fidias.FidiasRPC/GetKeyRPC", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -161,62 +142,32 @@ func (c *fidiasRPCClient) GetKeyRPC(ctx context.Context, in *KeyValuePair, opts 
 	return out, nil
 }
 
-func (c *fidiasRPCClient) RelocateRPC(ctx context.Context, opts ...grpc.CallOption) (FidiasRPC_RelocateRPCClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_FidiasRPC_serviceDesc.Streams[0], c.cc, "/fidias.FidiasRPC/RelocateRPC", opts...)
+func (c *fidiasRPCClient) ListDirRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (FidiasRPC_ListDirRPCClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_FidiasRPC_serviceDesc.Streams[0], c.cc, "/fidias.FidiasRPC/ListDirRPC", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &fidiasRPCRelocateRPCClient{stream}
+	x := &fidiasRPCListDirRPCClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	return x, nil
 }
 
-type FidiasRPC_RelocateRPCClient interface {
-	Send(*KeyState) error
-	Recv() (*KeyState, error)
+type FidiasRPC_ListDirRPCClient interface {
+	Recv() (*KVPair, error)
 	grpc.ClientStream
 }
 
-type fidiasRPCRelocateRPCClient struct {
+type fidiasRPCListDirRPCClient struct {
 	grpc.ClientStream
 }
 
-func (x *fidiasRPCRelocateRPCClient) Send(m *KeyState) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *fidiasRPCRelocateRPCClient) Recv() (*KeyState, error) {
-	m := new(KeyState)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *fidiasRPCClient) RelocateBlocksRPC(ctx context.Context, opts ...grpc.CallOption) (FidiasRPC_RelocateBlocksRPCClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_FidiasRPC_serviceDesc.Streams[1], c.cc, "/fidias.FidiasRPC/RelocateBlocksRPC", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &fidiasRPCRelocateBlocksRPCClient{stream}
-	return x, nil
-}
-
-type FidiasRPC_RelocateBlocksRPCClient interface {
-	Send(*KeyState) error
-	Recv() (*KeyState, error)
-	grpc.ClientStream
-}
-
-type fidiasRPCRelocateBlocksRPCClient struct {
-	grpc.ClientStream
-}
-
-func (x *fidiasRPCRelocateBlocksRPCClient) Send(m *KeyState) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *fidiasRPCRelocateBlocksRPCClient) Recv() (*KeyState, error) {
-	m := new(KeyState)
+func (x *fidiasRPCListDirRPCClient) Recv() (*KVPair, error) {
+	m := new(KVPair)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -227,11 +178,9 @@ func (x *fidiasRPCRelocateBlocksRPCClient) Recv() (*KeyState, error) {
 
 type FidiasRPCServer interface {
 	// Get key-value pair from remote
-	GetKeyRPC(context.Context, *KeyValuePair) (*KeyValuePair, error)
-	// Send key-location id pairs
-	RelocateRPC(FidiasRPC_RelocateRPCServer) error
-	// Send block id and journal value
-	RelocateBlocksRPC(FidiasRPC_RelocateBlocksRPCServer) error
+	GetKeyRPC(context.Context, *KVPair) (*KVPair, error)
+	// List directory contens for this node
+	ListDirRPC(*KVPair, FidiasRPC_ListDirRPCServer) error
 }
 
 func RegisterFidiasRPCServer(s *grpc.Server, srv FidiasRPCServer) {
@@ -239,7 +188,7 @@ func RegisterFidiasRPCServer(s *grpc.Server, srv FidiasRPCServer) {
 }
 
 func _FidiasRPC_GetKeyRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KeyValuePair)
+	in := new(KVPair)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -251,61 +200,30 @@ func _FidiasRPC_GetKeyRPC_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: "/fidias.FidiasRPC/GetKeyRPC",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FidiasRPCServer).GetKeyRPC(ctx, req.(*KeyValuePair))
+		return srv.(FidiasRPCServer).GetKeyRPC(ctx, req.(*KVPair))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _FidiasRPC_RelocateRPC_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(FidiasRPCServer).RelocateRPC(&fidiasRPCRelocateRPCServer{stream})
-}
-
-type FidiasRPC_RelocateRPCServer interface {
-	Send(*KeyState) error
-	Recv() (*KeyState, error)
-	grpc.ServerStream
-}
-
-type fidiasRPCRelocateRPCServer struct {
-	grpc.ServerStream
-}
-
-func (x *fidiasRPCRelocateRPCServer) Send(m *KeyState) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *fidiasRPCRelocateRPCServer) Recv() (*KeyState, error) {
-	m := new(KeyState)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
+func _FidiasRPC_ListDirRPC_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(KVPair)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	return m, nil
+	return srv.(FidiasRPCServer).ListDirRPC(m, &fidiasRPCListDirRPCServer{stream})
 }
 
-func _FidiasRPC_RelocateBlocksRPC_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(FidiasRPCServer).RelocateBlocksRPC(&fidiasRPCRelocateBlocksRPCServer{stream})
-}
-
-type FidiasRPC_RelocateBlocksRPCServer interface {
-	Send(*KeyState) error
-	Recv() (*KeyState, error)
+type FidiasRPC_ListDirRPCServer interface {
+	Send(*KVPair) error
 	grpc.ServerStream
 }
 
-type fidiasRPCRelocateBlocksRPCServer struct {
+type fidiasRPCListDirRPCServer struct {
 	grpc.ServerStream
 }
 
-func (x *fidiasRPCRelocateBlocksRPCServer) Send(m *KeyState) error {
+func (x *fidiasRPCListDirRPCServer) Send(m *KVPair) error {
 	return x.ServerStream.SendMsg(m)
-}
-
-func (x *fidiasRPCRelocateBlocksRPCServer) Recv() (*KeyState, error) {
-	m := new(KeyState)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
@@ -319,16 +237,9 @@ var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "RelocateRPC",
-			Handler:       _FidiasRPC_RelocateRPC_Handler,
+			StreamName:    "ListDirRPC",
+			Handler:       _FidiasRPC_ListDirRPC_Handler,
 			ServerStreams: true,
-			ClientStreams: true,
-		},
-		{
-			StreamName:    "RelocateBlocksRPC",
-			Handler:       _FidiasRPC_RelocateBlocksRPC_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
 	Metadata: "rpc.proto",
@@ -337,21 +248,19 @@ var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 256 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2c, 0x2a, 0x48, 0xd6,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x4b, 0xcb, 0x4c, 0xc9, 0x4c, 0x2c, 0x56, 0xf2, 0xe1,
-	0xe2, 0xf0, 0x4e, 0xad, 0x0c, 0x2e, 0x49, 0x2c, 0x49, 0x15, 0x12, 0xe0, 0x62, 0xf6, 0x4e, 0xad,
-	0x94, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09, 0x02, 0x31, 0x85, 0xc4, 0xb8, 0xd8, 0x7c, 0x13, 0x8b,
-	0xb2, 0x53, 0x8b, 0x24, 0x98, 0xc0, 0x82, 0x50, 0x1e, 0x48, 0xdc, 0x23, 0x35, 0x33, 0x3d, 0xa3,
-	0x44, 0x82, 0x59, 0x81, 0x51, 0x83, 0x37, 0x08, 0xca, 0x53, 0xea, 0x60, 0xe4, 0xe2, 0xf1, 0x4e,
-	0xad, 0x0c, 0x4b, 0xcc, 0x29, 0x4d, 0x0d, 0x48, 0xcc, 0x2c, 0xc2, 0x62, 0xa4, 0x08, 0x17, 0x2b,
-	0x58, 0x1a, 0x6a, 0x22, 0x84, 0x03, 0x12, 0x75, 0xcb, 0x49, 0x4c, 0x2f, 0x06, 0x9b, 0xc7, 0x1c,
-	0x04, 0xe1, 0x08, 0x29, 0x71, 0xf1, 0xf8, 0xe6, 0xa7, 0x64, 0xa6, 0x65, 0x26, 0x27, 0x96, 0x64,
-	0xe6, 0xe7, 0x49, 0xb0, 0x80, 0xb5, 0xa0, 0x88, 0x21, 0x39, 0x85, 0x15, 0xd9, 0x29, 0x46, 0xfb,
-	0x18, 0xb9, 0x38, 0xdd, 0xc0, 0x7e, 0x0c, 0x0a, 0x70, 0x16, 0xb2, 0xe4, 0xe2, 0x74, 0x4f, 0x2d,
-	0xf1, 0x4e, 0xad, 0x04, 0x71, 0x44, 0xf4, 0x20, 0x9e, 0xd7, 0x43, 0x76, 0xaa, 0x14, 0x56, 0x51,
-	0x25, 0x06, 0x21, 0x73, 0x2e, 0xee, 0xa0, 0xd4, 0x9c, 0xfc, 0xe4, 0xc4, 0x92, 0x54, 0x90, 0x66,
-	0x01, 0x24, 0x65, 0xe0, 0x60, 0x93, 0xc2, 0x10, 0x51, 0x62, 0xd0, 0x60, 0x34, 0x60, 0x14, 0xb2,
-	0xe5, 0x12, 0x84, 0x69, 0x74, 0xca, 0xc9, 0x4f, 0xce, 0x2e, 0x26, 0x49, 0x7b, 0x12, 0x1b, 0x38,
-	0xa2, 0x8c, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xcd, 0xe0, 0x85, 0x8b, 0xb5, 0x01, 0x00, 0x00,
+	// 224 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0xd0, 0x41, 0x4b, 0xc3, 0x30,
+	0x14, 0xc0, 0x71, 0x63, 0xb7, 0x8c, 0x3e, 0xa6, 0xc8, 0x43, 0x24, 0x78, 0x0a, 0x3d, 0xe5, 0x62,
+	0x19, 0xfa, 0x11, 0x94, 0x29, 0x74, 0x83, 0x11, 0x64, 0xf7, 0xb8, 0x66, 0xf5, 0x41, 0x35, 0x25,
+	0x8d, 0x87, 0x7e, 0x2d, 0x3f, 0xa1, 0x24, 0xd1, 0x83, 0x9e, 0xbc, 0xe5, 0xf7, 0x27, 0x90, 0xbc,
+	0x07, 0xa5, 0x1f, 0x0e, 0xf5, 0xe0, 0x5d, 0x70, 0xc8, 0x8f, 0xd4, 0x92, 0x19, 0xab, 0x4f, 0x06,
+	0xbc, 0xd9, 0xef, 0x0c, 0x79, 0xbc, 0x80, 0xa2, 0xb1, 0x93, 0x60, 0x92, 0xa9, 0xa5, 0x8e, 0x47,
+	0xbc, 0x84, 0xf9, 0xde, 0xf4, 0x1f, 0x56, 0x9c, 0xa6, 0x96, 0x11, 0xeb, 0xba, 0x37, 0xdd, 0x28,
+	0x0a, 0xc9, 0x54, 0xa1, 0x33, 0x62, 0xdd, 0x3c, 0xd3, 0x9b, 0x15, 0x33, 0xc9, 0xd4, 0x4c, 0x67,
+	0xa0, 0x80, 0xc5, 0xd6, 0xb5, 0xa9, 0xcf, 0x53, 0xff, 0x21, 0x56, 0xb0, 0xdc, 0xba, 0x96, 0x8e,
+	0x74, 0x30, 0x81, 0xdc, 0xbb, 0xe0, 0xe9, 0x89, 0x5f, 0x0d, 0xaf, 0x80, 0x3f, 0x59, 0xea, 0x5e,
+	0x83, 0x58, 0x48, 0xa6, 0xce, 0xf4, 0xb7, 0x6e, 0x7b, 0x28, 0xd7, 0xe9, 0xfb, 0x7a, 0x77, 0x8f,
+	0x37, 0x50, 0x3e, 0xda, 0xd0, 0xd8, 0x29, 0xe2, 0xbc, 0xce, 0x73, 0xd5, 0x79, 0xa6, 0xeb, 0x3f,
+	0xae, 0x4e, 0x70, 0x05, 0xb0, 0xa1, 0x31, 0x3c, 0x90, 0xff, 0xd7, 0xfd, 0x15, 0x7b, 0xe1, 0x69,
+	0x63, 0x77, 0x5f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xc9, 0x5b, 0xd9, 0x1c, 0x3e, 0x01, 0x00, 0x00,
 }
