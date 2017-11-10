@@ -110,20 +110,21 @@ func (fsm *FSM) applyKVSet(entryID []byte, entry *hexalog.Entry, value []byte) e
 	}
 
 	// Insert key to dht
-	if err = fsm.dht.Insert(kv.Key, fsm.localTuple); err != nil {
+	if err = fsm.dht.Insert(entry.Key, fsm.localTuple); err != nil {
 		log.Println("[ERROR] FSM dht insert failed:", err)
 	}
 
 	// Insert any directories created to dht
 	for _, c := range createdDirs {
-		if er := fsm.dht.Insert(c.Key, fsm.localTuple); er != nil {
+		nskey := append(fsm.kvprefix, c.Key...)
+		if er := fsm.dht.Insert(nskey, fsm.localTuple); er != nil {
 			log.Println("[ERROR] FSM dht insert failed:", er)
 			err = er
 		}
 	}
 
-	log.Printf("[DEBUG] FSM key=%s dirs-created=%d height=%d error='%v'",
-		kv.Key, len(createdDirs), kv.Height, err)
+	log.Printf("[DEBUG] FSM nskey=%s dirs-created=%d height=%d error='%v'",
+		entry.Key, len(createdDirs), kv.Height, err)
 
 	return err
 }
@@ -133,7 +134,7 @@ func (fsm *FSM) applyKVDelete(entry *hexalog.Entry) error {
 	key := bytes.TrimPrefix(entry.Key, fsm.kvprefix)
 	err := fsm.kvs.Remove(key)
 	if err == nil {
-		err = fsm.dht.Delete(key)
+		err = fsm.dht.Delete(entry.Key)
 	}
 	return err
 }
