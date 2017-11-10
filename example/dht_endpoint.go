@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hexablock/go-kelips"
 )
@@ -24,12 +26,15 @@ func (server *httpServer) handleDHT(w http.ResponseWriter, r *http.Request, reso
 			id = []byte(resource)
 		}
 
+		start := time.Now()
 		nodes, er := server.dht.Lookup(id)
 		if er != nil {
 			err = er
 			break
 		}
+		end := time.Since(start)
 
+		w.Header().Set(headerRespTime, fmt.Sprintf("%v", end))
 		b, er := json.Marshal(nodes)
 		if er != nil {
 			err = er
