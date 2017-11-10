@@ -115,13 +115,10 @@ type KVS struct {
 func NewKVS(prefix string, wal WAL, trans KVTransport, dht DHT) *KVS {
 	kv := &KVS{
 		prefix: []byte(prefix),
-		//kv:     kvstore,
-		hxl: wal,
-		//trans: newLocalKVTransport(host, remote),
-		trans: trans,
-		dht:   dht,
+		hxl:    wal,
+		trans:  trans,
+		dht:    dht,
 	}
-	//kv.trans.Register(kvstore)
 
 	return kv
 }

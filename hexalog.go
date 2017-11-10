@@ -19,73 +19,31 @@ type Jury interface {
 // Hexalog is a network aware Hexalog.  It implements selecting the
 // participants from the network for consistency
 type Hexalog struct {
-	// Hexalog config
-	//	conf *hexalog.Config
+	// hash function to use
 	hashFunc func() hash.Hash
+
+	// min votes for any log entry
 	minVotes int
-	// Hexalog store
-	//store *hexalog.LogStore
 
-	// Hexalog instance
-	//hexlog *hexalog.Hexalog
-
-	// Unified local/remote transport
-	//trans *localHexalogTransport
-	//trans hexalog.Transport
+	// Hexalog
 	trans WALTransport
 
 	// Jury selector for voting rounds
 	jury Jury
-
-	//fsm *FSM
 }
 
 // NewHexalog inits a new fidias hexalog instance attached to the ring.  Remote must
 // be registered to grpc before init'ing hexalog
 func NewHexalog(minVotes int, hf func() hash.Hash, trans WALTransport) (*Hexalog, error) {
-	// if conf.Hostname == "" {
-	// 	return nil, fmt.Errorf("missing hostname")
-	// }
-
-	// logstore := hexalog.NewLogStore(entries, index, conf.Hasher)
-	// hexlog, err := hexalog.NewHexalog(conf, fsm, entries, index, stable, trans)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	hxl := &Hexalog{
 		minVotes: minVotes,
 		hashFunc: hf,
 		trans:    trans,
-		//conf:  conf,
-		//fsm:    fsm,
-		//store:  logstore,
-		//	hexlog: hexlog,
 	}
-
-	// hxl.trans = &localHexalogTransport{
-	// 	host:   conf.Hostname,
-	// 	hexlog: hexlog,
-	// 	store:  logstore,
-	// 	remote: remote,
-	// }
 
 	return hxl, nil
 }
-
-// RegisterJury registers a jury to get participants for a consensus round
-// func (hexlog *Hexalog) RegisterJury(jury Jury) {
-// 	hexlog.jury = jury
-// }
-
-// Seed seeds data from an exiting host.  This is to be called before beginning
-// the use of the log to ensure consistency with the network. It takes a buffer
-// size and number of parallel seedings
-// func (hexlog *Hexalog) Seed(existing string, bufsize, parallel int) error {
-// 	log.Println("[INFO] Seeding from", existing)
-// 	err := hexlog.hexlog.Seed(existing, bufsize, parallel)
-// 	return err
-// }
 
 // NewEntry returns a new Entry for the given key from Hexalog.  It returns an
 // error if the node is not part of the location set or a lookup error occurs
