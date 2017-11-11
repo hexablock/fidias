@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"hash"
 
+	"google.golang.org/grpc"
+
 	"github.com/hashicorp/memberlist"
 	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
@@ -20,6 +22,11 @@ type Config struct {
 	// Data directory
 	DataDir string
 
+	// Wal buffer size when seeding data
+	WalSeedBuffSize int
+	// Wal parallel go-routines for seeding
+	WalSeedParallel int
+
 	// Any existing peers. This will automatically cause the node to join the
 	// cluster
 	Peers []string
@@ -27,6 +34,8 @@ type Config struct {
 	Memberlist *memberlist.Config
 	Hexalog    *hexalog.Config
 	DHT        *kelips.Config
+
+	GRPCServer *grpc.Server
 }
 
 // HashFunc returns the hash function used for the fidias as a whole.  These
@@ -44,11 +53,14 @@ func (config *Config) SetHashFunc(hf func() hash.Hash) {
 // DefaultConfig returns a minimally required config
 func DefaultConfig() *Config {
 	conf := &Config{
-		Replicas: 2,
-		KVPrefix: "kv/",
-		Peers:    []string{},
-		Hexalog:  hexalog.DefaultConfig(""),
-		DHT:      kelips.DefaultConfig(""),
+		Replicas:        2,
+		WalSeedBuffSize: 32,
+		WalSeedParallel: 2,
+		KVPrefix:        "kv/",
+		Peers:           []string{},
+		Hexalog:         hexalog.DefaultConfig(""),
+		DHT:             kelips.DefaultConfig(""),
+		GRPCServer:      grpc.NewServer(),
 	}
 	conf.Hexalog.Votes = 2
 	conf.SetHashFunc(sha256.New)

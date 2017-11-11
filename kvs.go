@@ -125,9 +125,11 @@ func NewKVS(prefix string, wal WAL, trans KVTransport, dht DHT) *KVS {
 
 // Get returns a KVPair for the key if it exists otherwise an error is returned
 func (kvs *KVS) Get(key []byte, opt *ReadOptions) (*KVPair, *ReadStats, error) {
+	nskey := append(kvs.prefix, key...)
+
 	start := time.Now()
 
-	nodes, err := kvs.dht.Lookup(key)
+	nodes, err := kvs.dht.Lookup(nskey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -166,9 +168,11 @@ func (kvs *KVS) Get(key []byte, opt *ReadOptions) (*KVPair, *ReadStats, error) {
 
 // List performs a lookup on dir and retrieves all children from each node.
 func (kvs *KVS) List(dir []byte, opt *ReadOptions) ([]*KVPair, *ReadStats, error) {
+	nsdir := append(kvs.prefix, dir...)
+
 	start := time.Now()
 
-	nodes, err := kvs.dht.Lookup(dir)
+	nodes, err := kvs.dht.Lookup(nsdir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -243,6 +247,7 @@ func (kvs *KVS) Set(kv *KVPair, wo *WriteOptions) (*KVPair, *WriteStats, error) 
 // otherwise a KVPair with the new Modification and Height is returned
 func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *WriteStats, error) {
 	nskey := append(kvs.prefix, kv.Key...)
+
 	last, err := kvs.hxl.GetEntry(nskey, mod)
 	if err != nil {
 		return nil, nil, err
@@ -287,6 +292,7 @@ func (kvs *KVS) Remove(key []byte, wo *WriteOptions) (*WriteStats, error) {
 // It returns an error if there is a mismatch
 func (kvs *KVS) CARemove(key []byte, mod []byte, wo *WriteOptions) (*WriteStats, error) {
 	nskey := append(kvs.prefix, key...)
+
 	last, err := kvs.hxl.GetEntry(nskey, mod)
 	if err != nil {
 		return nil, err

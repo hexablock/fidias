@@ -91,7 +91,7 @@ func (del *delegate) NotifyMsg(msg []byte) {
 // boolean indicates this is for a join instead of a push/pull.
 func (del *delegate) LocalState(join bool) []byte {
 	if join {
-
+		// Send dht snapshot
 		snapshot := del.dht.Snapshot()
 		b, err := proto.Marshal(snapshot)
 		if err != nil {
@@ -114,6 +114,7 @@ func (del *delegate) LocalState(join bool) []byte {
 func (del *delegate) MergeRemoteState(buf []byte, join bool) {
 
 	if join {
+		//log.Printf("[DEBUG] MergeRemoteState got snapshot size=%d", len(buf))
 		del.seedDHT(buf)
 	}
 

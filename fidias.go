@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/hashicorp/memberlist"
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/device"
@@ -70,15 +68,17 @@ type Fidias struct {
 	// KV API
 	kvs *KVS
 
-	// Block device for blox API
+	// DHT enabled BlockDevice for blox API
 	dev *BlockDevice
 
 	// Actual kv store
 	kvstore KVStore
 
-	grpc *grpc.Server
+	// DHT enabled hexalog
+	wal *Hexalog
 
-	hexalog *Hexalog
+	// local hexalog instance
+	hexalog *hexalog.Hexalog
 }
 
 // Create creates a new fidias instance.  It inits the local node, gossip layer
@@ -95,7 +95,6 @@ func Create(conf *Config) (*Fidias, error) {
 		ltime:   &hexatype.LamportClock{},
 		kvstore: NewInmemKVStore(),
 		coord:   coord,
-		grpc:    grpc.NewServer(),
 	}
 
 	// The order of initialization is important
@@ -144,7 +143,7 @@ func (fidias *Fidias) init() {
 }
 
 func (fidias *Fidias) initDHT() error {
-	udpAddr, err := net.ResolveUDPAddr("udp", fidias.conf.DHT.Hostname)
+	udpAddr, err := net.ResolveUDPAddr("udp", fidias.conf.DHT.AdvertiseHost)
 	if err != nil {
 		return err
 	}
@@ -163,7 +162,7 @@ func (fidias *Fidias) initDHT() error {
 
 // must be called after dht is init'd
 func (fidias *Fidias) initBlockDevice() error {
-	ln, err := net.Listen("tcp", fidias.conf.DHT.Hostname)
+	ln, err := net.Listen("tcp", fidias.conf.DHT.AdvertiseHost)
 	if err != nil {
 		return err
 	}
@@ -184,7 +183,7 @@ func (fidias *Fidias) initBlockDevice() error {
 	remote := blox.NewNetTransport(opts)
 
 	// Local and remote
-	trans := blox.NewLocalNetTranport(fidias.conf.DHT.Hostname, remote)
+	trans := blox.NewLocalNetTranport(fidias.conf.DHT.AdvertiseHost, remote)
 
 	// DHT block device
 	fidias.dev = NewBlockDevice(fidias.conf.Replicas, fidias.conf.HashFunc, trans)
@@ -196,7 +195,9 @@ func (fidias *Fidias) initBlockDevice() error {
 }
 
 func (fidias *Fidias) initHexalog() error {
-
+	// Data stores
+	//entries := hexalog.NewInMemEntryStore()
+	//index := hexalog.NewInMemIndexStore()
 	edir := filepath.Join(fidias.conf.DataDir, "log", "entry")
 	os.MkdirAll(edir, 0755)
 	entries := hexaboltdb.NewEntryStore()
@@ -211,8 +212,9 @@ func (fidias *Fidias) initHexalog() error {
 		return err
 	}
 
-	//entries := hexalog.NewInMemEntryStore()
-	//index := hexalog.NewInMemIndexStore()
+	// Network transport
+	hlnet := hexalog.NewNetTransport(30*time.Second, 300*time.Second)
+	hexalog.RegisterHexalogRPCServer(fidias.conf.GRPCServer, hlnet)
 
 	stable := &hexalog.InMemStableStore{}
 
@@ -220,22 +222,20 @@ func (fidias *Fidias) initHexalog() error {
 	fsm := NewFSM(fidias.conf.KVPrefix, localTuple, fidias.kvstore)
 	fsm.RegisterDHT(fidias.dht)
 
-	// Network transport
-	hlnet := hexalog.NewNetTransport(30*time.Second, 300*time.Second)
-	hexalog.RegisterHexalogRPCServer(fidias.grpc, hlnet)
-
 	hexlog, err := hexalog.NewHexalog(fidias.conf.Hexalog, fsm, entries, index, stable, hlnet)
 	if err != nil {
 		return err
 	}
 
+	fidias.hexalog = hexlog
+
 	trans := &localHexalogTransport{
-		host:   fidias.conf.Hexalog.Hostname,
+		host:   fidias.conf.Hexalog.AdvertiseHost,
 		hexlog: hexlog,
 		remote: hlnet,
 	}
 
-	fidias.hexalog = &Hexalog{
+	fidias.wal = &Hexalog{
 		hashFunc: fidias.conf.Hexalog.Hasher,
 		minVotes: fidias.conf.Hexalog.Votes,
 		trans:    trans,
@@ -248,22 +248,22 @@ func (fidias *Fidias) initHexalog() error {
 // init kvs.  hexalog needs to be init'd before this
 func (fidias *Fidias) initKVS() {
 	kvnet := NewNetTransport(30*time.Second, 300*time.Second)
-	RegisterFidiasRPCServer(fidias.grpc, kvnet)
+	RegisterFidiasRPCServer(fidias.conf.GRPCServer, kvnet)
 
-	kvtrans := newLocalKVTransport(fidias.conf.Hexalog.Hostname, kvnet)
+	kvtrans := newLocalKVTransport(fidias.conf.Hexalog.AdvertiseHost, kvnet)
 	kvtrans.Register(fidias.kvstore)
 
-	fidias.kvs = NewKVS(fidias.conf.KVPrefix, fidias.hexalog, kvtrans, fidias.dht)
+	fidias.kvs = NewKVS(fidias.conf.KVPrefix, fidias.wal, kvtrans, fidias.dht)
 }
 
 func (fidias *Fidias) startGrpc() error {
-	ln, err := net.Listen("tcp", fidias.conf.Hexalog.Hostname)
+	ln, err := net.Listen("tcp", fidias.conf.Hexalog.AdvertiseHost)
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		if er := fidias.grpc.Serve(ln); er != nil {
+		if er := fidias.conf.GRPCServer.Serve(ln); er != nil {
 			log.Fatal(er)
 		}
 	}()
@@ -277,19 +277,32 @@ func (fidias *Fidias) DHT() DHT {
 	return fidias.dht
 }
 
-// KVS returns the kvs instance
-func (fidias *Fidias) KVS() *KVS {
-	return fidias.kvs
-}
-
 // BlockDevice returns a cluster aware block device
 func (fidias *Fidias) BlockDevice() *BlockDevice {
 	return fidias.dev
 }
 
+// WAL returns the write-ahead-log for consistent operations
+func (fidias *Fidias) WAL() WAL {
+	return fidias.wal
+}
+
+// KVS returns the kvs instance
+func (fidias *Fidias) KVS() *KVS {
+	return fidias.kvs
+}
+
 // Join joins the gossip networking using an existing node
 func (fidias *Fidias) Join(existing []string) error {
+	if fidias.hexalog == nil {
+		return fmt.Errorf("hexalog not initialized")
+	}
+
+	// err:=fidias.hexalog.Seed(existing, fidias.conf.WalSeedBuffSize, fidias.conf.WalSeedParallel)
+	// if err==nil {
 	//
+	// }
+
 	_, err := fidias.memberlist.Join(existing)
 	return err
 }

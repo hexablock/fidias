@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/hexablock/fidias3"
+	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexatype"
 )
 

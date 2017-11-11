@@ -3,17 +3,15 @@ package main
 import (
 	"crypto/sha256"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/hashicorp/memberlist"
-	"github.com/hexablock/fidias3"
+	"github.com/hexablock/fidias"
 	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/log"
@@ -104,60 +102,61 @@ func (cli *CLI) initAgentConfig(datadir string) *fidias.Config {
 	return c
 }
 
-func (cli *CLI) initClient() *fidias.Client {
+//
+// func (cli *CLI) initClient() *fidias.Client {
+//
+// 	if *joinAddr == "" {
+// 		fmt.Println("FID_PEERS environment variable not set")
+// 		os.Exit(1)
+// 	}
+//
+// 	conf := fidias.DefaultConfig()
+// 	conf.Peers = strings.Split(*joinAddr, ",")
+// 	client, err := fidias.NewClient(conf)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+//
+// 	return client
+// }
 
-	if *joinAddr == "" {
-		fmt.Println("FID_PEERS environment variable not set")
-		os.Exit(1)
-	}
+// func (cli *CLI) runClient(args []string) {
+// 	client := cli.initClient()
+// 	kvs := client.KVS()
+//
+// 	cmd := args[0]
+//
+// 	switch cmd {
+//
+// 	case "ls":
+// 		cli.runClientLs(kvs, args[1])
+//
+// 	case "cp":
+// 		cli.runClientCp(args[1])
+//
+// 	default:
+// 		fmt.Println("Invalid command:", cmd)
+// 		os.Exit(1)
+// 	}
+//
+// 	//fmt.Println(args)
+//
+// }
 
-	conf := fidias.DefaultConfig()
-	conf.Peers = strings.Split(*joinAddr, ",")
-	client, err := fidias.NewClient(conf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return client
-}
-
-func (cli *CLI) runClient(args []string) {
-	client := cli.initClient()
-	kvs := client.KVS()
-
-	cmd := args[0]
-
-	switch cmd {
-
-	case "ls":
-		cli.runClientLs(kvs, args[1])
-
-	case "cp":
-		cli.runClientCp(args[1])
-
-	default:
-		fmt.Println("Invalid command:", cmd)
-		os.Exit(1)
-	}
-
-	//fmt.Println(args)
-
-}
-
-func (cli *CLI) runClientLs(kvs *fidias.KVS, dirname string) {
-	opt := &fidias.ReadOptions{}
-	kvps, _, err := kvs.List([]byte(dirname), opt)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(2)
-	}
-
-	fmt.Println(kvps)
-}
-
-func (cli *CLI) runClientCp(filename string) {
-
-}
+// func (cli *CLI) runClientLs(kvs *fidias.KVS, dirname string) {
+// 	opt := &fidias.ReadOptions{}
+// 	kvps, _, err := kvs.List([]byte(dirname), opt)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		os.Exit(2)
+// 	}
+//
+// 	fmt.Println(kvps)
+// }
+//
+// func (cli *CLI) runClientCp(filename string) {
+//
+// }
 
 func (cli *CLI) Run() {
 	flag.Parse()
@@ -170,11 +169,12 @@ func (cli *CLI) Run() {
 		log.SetLevel("INFO")
 	}
 
-	if *isAgent {
-		cli.runAgent()
-	} else {
-		cli.runClient(flag.Args())
-	}
+	// if *isAgent {
+	// 	cli.runAgent()
+	// } else {
+	// 	cli.runClient(flag.Args())
+	// }
+	cli.runAgent()
 
 }
 

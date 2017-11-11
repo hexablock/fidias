@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	fidias "github.com/hexablock/fidias3"
+	"github.com/hexablock/fidias"
 )
 
 func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resource string) {

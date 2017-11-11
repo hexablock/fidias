@@ -32,19 +32,6 @@ type Hexalog struct {
 	jury Jury
 }
 
-// NewHexalog inits a new fidias hexalog instance attached to the ring.  Remote must
-// be registered to grpc before init'ing hexalog
-func NewHexalog(minVotes int, hf func() hash.Hash, trans WALTransport) (*Hexalog, error) {
-
-	hxl := &Hexalog{
-		minVotes: minVotes,
-		hashFunc: hf,
-		trans:    trans,
-	}
-
-	return hxl, nil
-}
-
 // NewEntry returns a new Entry for the given key from Hexalog.  It returns an
 // error if the node is not part of the location set or a lookup error occurs
 func (hexlog *Hexalog) NewEntry(key []byte) (*hexalog.Entry, []*hexalog.Participant, error) {
