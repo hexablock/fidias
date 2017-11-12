@@ -95,6 +95,7 @@ func (trans *NetTransport) SetRPC(ctx context.Context, req *WriteRequest) (*Writ
 	return resp, nil
 }
 
+// CASetRPC serves a cluster CASet request
 func (trans *NetTransport) CASetRPC(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	kv, stats, err := trans.kvs.CASet(req.KV, req.KV.Modification, req.Options)
 	if err != nil {
@@ -113,6 +114,7 @@ func (trans *NetTransport) CASetRPC(ctx context.Context, req *WriteRequest) (*Wr
 	return resp, nil
 }
 
+// RemoveRPC serves a cluster Remove request
 func (trans *NetTransport) RemoveRPC(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	stats, err := trans.kvs.Remove(req.KV.Key, req.Options)
 	if err != nil {
@@ -130,6 +132,7 @@ func (trans *NetTransport) RemoveRPC(ctx context.Context, req *WriteRequest) (*W
 	return resp, nil
 }
 
+// CARemoveRPC serves a cluster CARemove request
 func (trans *NetTransport) CARemoveRPC(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	stats, err := trans.kvs.CARemove(req.KV.Key, req.KV.Modification, req.Options)
 	if err != nil {
@@ -153,17 +156,8 @@ func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KVPair) (*KVPair, 
 	return trans.kv.Get(in.Key)
 }
 
-// GetRPC serves a get request from the cluster
-// func (trans *NetTransport) GetRPC(ctx context.Context, in *KVPair) (*ReadResponse, error) {
-// 	log.Printf("[DEBUG] NetTransport.GetRPC key=%s", in.Key)
-// 	kv, stats, err := trans.kvs.Get(in.Key, &ReadOptions{})
-// 	if err == nil {
-// 		return &ReadResponse{KV: kv, Stats: stats}, nil
-// 	}
-// 	return nil, err
-// }
-
-// ListDirRPC serves a list dir request.  It sends all the kv's for a given dir
+// ListDirRPC serves a list dir request from the local store.  It streams all
+// kv's for a given dir
 func (trans *NetTransport) ListDirRPC(in *KVPair, stream FidiasRPC_ListDirRPCServer) error {
 	var err error
 	trans.kv.Iter(in.Key, false, func(kv *KVPair) bool {

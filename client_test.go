@@ -5,9 +5,25 @@ import (
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/hexablock/phi"
 )
 
+func Test_Client_errors(t *testing.T) {
+	conf := &Config{}
+	if _, err := NewClient(conf); err == nil {
+		t.Fatal("should fail")
+	}
+	conf.Peers = []string{"test", "test2"}
+	conf.Phi = phi.DefaultConfig()
+	if _, err := NewClient(conf); err == nil {
+		t.Fatal("should fail")
+	}
+
+}
+
 func Test_Client(t *testing.T) {
+
 	fid0, err := newTestFidias("127.0.0.1:42000", "127.0.0.1:17080", "127.0.0.1", 49950)
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +89,16 @@ func Test_Client(t *testing.T) {
 	//	<-time.After(2 * time.Second)
 	if _, _, err = kvstore.Get(kv.Key, &ReadOptions{}); err == nil {
 		t.Fatal("should fail")
+	}
+
+	rkv := NewKVPair([]byte("key-remove"), []byte("remove"))
+	rkvMod, _, err := kvstore.Set(rkv, wo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = kvstore.CARemove(rkv.Key, rkvMod.Modification, wo); err != nil {
+		t.Fatal(err)
 	}
 
 	fid0.Shutdown()

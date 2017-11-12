@@ -11,6 +11,7 @@ import (
 	"github.com/hexablock/phi"
 )
 
+// KV is a client KV interface to perform key-value operations.
 type KV struct {
 	walHost string
 
@@ -18,6 +19,7 @@ type KV struct {
 	pool *outPool
 }
 
+// Set makes a set client request
 func (kv *KV) Set(kvp *KVPair, wo *WriteOptions) (*KVPair, *WriteStats, error) {
 	conn, err := kv.pool.getConn(kv.walHost)
 	if err != nil {
@@ -103,11 +105,14 @@ type Client struct {
 	// DHT aware block device - Get, Set, Remove
 	dev *phi.BlockDevice
 
+	// Client kvs interface
 	kvs *KVS
 
+	// outbound grpc pool
 	pool *outPool
 }
 
+// NewClient inits a new fidias client with the config.
 func NewClient(conf *Config) (client *Client, err error) {
 	client = &Client{conf: conf, pool: newOutPool(300*time.Second, 45*time.Second)}
 
