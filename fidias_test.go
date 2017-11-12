@@ -39,8 +39,9 @@ func testMemberlistConfig(klpAddr, host string, port int) *memberlist.Config {
 }
 
 func newTestFidias(klpAddr, httpAddr, host string, port int) (*Fidias, error) {
+	c := DefaultConfig()
 
-	conf := DefaultConfig()
+	conf := c.Phi
 	conf.Memberlist = testMemberlistConfig(klpAddr, host, port)
 	conf.DHT = kelips.DefaultConfig(klpAddr)
 	conf.DHT.Meta["hexalog"] = httpAddr
@@ -48,7 +49,8 @@ func newTestFidias(klpAddr, httpAddr, host string, port int) (*Fidias, error) {
 	conf.Hexalog.Votes = 2
 	conf.DataDir, _ = ioutil.TempDir("/tmp", "fid-")
 	conf.SetHashFunc(sha256.New)
-	return Create(conf)
+
+	return Create(c)
 }
 
 func Test_Fidias(t *testing.T) {
@@ -97,4 +99,55 @@ func Test_Fidias(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	kvp, _, err := kvs.Get([]byte("key"), &ReadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(kvp.Value) != "value" {
+		t.Fatal("wrong value")
+	}
+
+	kv = NewKVPair([]byte("vault/0.8"), []byte("value"))
+	nkv, _, err := kvs.Set(kv, wo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-time.After(200 * time.Millisecond)
+	ls, _, err := kvs.List([]byte("vault"), &ReadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ls) != 1 {
+		t.Fatal("should have a 1 item")
+	}
+
+	k := NewKVPair([]byte("vault/0.8"), []byte("newvalue"))
+	_, _, err = kvs.CASet(k, nkv.Modification, wo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vkv, _, err := kvs.Get([]byte("vault/0.8"), &ReadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = kvs.Remove([]byte("key"), wo); err != nil {
+		t.Fatal(err)
+	}
+
+	<-time.After(50 * time.Millisecond)
+	if _, _, err = kvs.Get([]byte("key"), &ReadOptions{}); err == nil {
+		t.Error("should fail")
+	}
+
+	if _, err = kvs.CARemove([]byte("vault/0.8"), vkv.Modification, wo); err != nil {
+		t.Fatal(err)
+	}
+
+	<-time.After(20 * time.Millisecond)
+	if _, _, err = kvs.Get([]byte("vault/0.8"), &ReadOptions{}); err == nil {
+		t.Fatal("should fail")
+	}
 }

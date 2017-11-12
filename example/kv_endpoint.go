@@ -6,13 +6,14 @@ import (
 	"net/http"
 
 	"github.com/hexablock/fidias"
+	"github.com/hexablock/phi"
 )
 
 func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resource string) {
 	var (
 		data  interface{}
 		err   error
-		stats *fidias.WriteStats
+		stats *phi.WriteStats
 		key   = []byte(resource)
 	)
 
@@ -34,7 +35,7 @@ func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resou
 			data, rstats, err = server.kvs.List(key, &fidias.ReadOptions{})
 		} else {
 			data = kv
-			setNodeGroupHeaders(w, rstats.Group, rstats.Priority, *rstats.Nodes[0])
+			setNodeGroupHeaders(w, int(rstats.Group), int(rstats.Priority), *rstats.Nodes[0])
 		}
 
 		setReadHeader(w, rstats)

@@ -2,12 +2,26 @@ syntax = "proto3";
 
 package fidias;
 
+import "github.com/hexablock/hexatype/structs.proto";
+import "github.com/hexablock/hexalog/rpc.proto";
+//import "github.com/hexablock/phi/rpc.proto";
+//import "google/api/annotations.proto";
+
 service FidiasRPC {
-    // Get key-value pair from remote
+    // Get key-value pair from a single remote
     rpc GetKeyRPC(KVPair) returns (KVPair) {}
 
-    // List directory contens for this node
+    // List directory contents from a single remote
     rpc ListDirRPC(KVPair) returns (stream KVPair) {}
+
+    // Set key on cluster
+    rpc SetRPC(WriteRequest) returns (WriteResponse) {}
+    // Set key on cluster
+    rpc CASetRPC(WriteRequest) returns (WriteResponse) {}
+    // Remove key on cluster
+    rpc RemoveRPC(WriteRequest) returns (WriteResponse) {}
+    // Remove key on cluster
+    rpc CARemoveRPC(WriteRequest) returns (WriteResponse) {}
 }
 
 message KVPair {
@@ -32,4 +46,44 @@ message KVPair {
 
     // Entry height creating this view
     uint32 Height = 7;
+}
+
+message ReadStats {
+	// Node serving the read
+	repeated hexatype.Node Nodes = 1;
+	// Affinity group
+	int32 Group = 2;
+	// Node priority in the group
+	int32 Priority = 3;
+	// Response time
+	int64 RespTime = 4;
+}
+
+message WriteStats {
+	int64 BallotTime = 1;
+	int64 ApplyTime = 2;
+	repeated hexalog.Participant Participants = 3;
+}
+
+message WriteOptions {
+	bool WaitBallot = 1;
+	bool WaitApply = 2;
+	int64 WaitApplyTimeout = 3;
+	int32 Retries = 4;
+	int64 RetryInterval = 5;
+}
+
+message WriteRequest {
+    KVPair KV = 1;
+    WriteOptions Options = 2;
+}
+
+// message ReadResponse {
+//     KVPair KV = 1;
+//     ReadStats Stats = 2;
+// }
+
+message WriteResponse {
+    KVPair KV = 1;
+    WriteStats Stats = 3;
 }

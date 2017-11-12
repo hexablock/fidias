@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/hexatype"
+	"github.com/hexablock/phi"
 )
 
 const (
@@ -32,8 +34,8 @@ var accessControlHeaders = map[string]string{
 }
 
 type httpServer struct {
-	dht fidias.DHT
-	dev *fidias.BlockDevice
+	dht phi.DHT
+	dev *phi.BlockDevice
 	kvs *fidias.KVS
 }
 
@@ -70,7 +72,7 @@ func (server *httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func setWriteHeaderStats(w http.ResponseWriter, stats *fidias.WriteStats) {
+func setWriteHeaderStats(w http.ResponseWriter, stats *phi.WriteStats) {
 	w.Header().Set(headerBallotTime, fmt.Sprintf("%v", stats.BallotTime))
 	w.Header().Set(headerFsmTime, fmt.Sprintf("%v", stats.ApplyTime))
 
@@ -88,7 +90,7 @@ func setReadHeader(w http.ResponseWriter, stats *fidias.ReadStats) {
 		nodes += fmt.Sprintf("%s/%x,", n.Host(), n.ID)
 	}
 	w.Header().Set(headerParticipants, nodes[:len(nodes)-1])
-	w.Header().Set(headerRespTime, stats.RespTime.String())
+	w.Header().Set(headerRespTime, time.Duration(stats.RespTime).String())
 }
 
 func setNodeGroupHeaders(w http.ResponseWriter, g, p int, node hexatype.Node) {

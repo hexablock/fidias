@@ -9,12 +9,19 @@ It is generated from these files:
 
 It has these top-level messages:
 	KVPair
+	ReadStats
+	WriteStats
+	WriteOptions
+	WriteRequest
+	WriteResponse
 */
 package fidias
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
+import hexatype "github.com/hexablock/hexatype"
+import hexalog "github.com/hexablock/hexalog"
 
 import (
 	context "golang.org/x/net/context"
@@ -104,8 +111,185 @@ func (m *KVPair) GetHeight() uint32 {
 	return 0
 }
 
+type ReadStats struct {
+	// Node serving the read
+	Nodes []*hexatype.Node `protobuf:"bytes,1,rep,name=Nodes" json:"Nodes,omitempty"`
+	// Affinity group
+	Group int32 `protobuf:"varint,2,opt,name=Group" json:"Group,omitempty"`
+	// Node priority in the group
+	Priority int32 `protobuf:"varint,3,opt,name=Priority" json:"Priority,omitempty"`
+	// Response time
+	RespTime int64 `protobuf:"varint,4,opt,name=RespTime" json:"RespTime,omitempty"`
+}
+
+func (m *ReadStats) Reset()                    { *m = ReadStats{} }
+func (m *ReadStats) String() string            { return proto.CompactTextString(m) }
+func (*ReadStats) ProtoMessage()               {}
+func (*ReadStats) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *ReadStats) GetNodes() []*hexatype.Node {
+	if m != nil {
+		return m.Nodes
+	}
+	return nil
+}
+
+func (m *ReadStats) GetGroup() int32 {
+	if m != nil {
+		return m.Group
+	}
+	return 0
+}
+
+func (m *ReadStats) GetPriority() int32 {
+	if m != nil {
+		return m.Priority
+	}
+	return 0
+}
+
+func (m *ReadStats) GetRespTime() int64 {
+	if m != nil {
+		return m.RespTime
+	}
+	return 0
+}
+
+type WriteStats struct {
+	BallotTime   int64                  `protobuf:"varint,1,opt,name=BallotTime" json:"BallotTime,omitempty"`
+	ApplyTime    int64                  `protobuf:"varint,2,opt,name=ApplyTime" json:"ApplyTime,omitempty"`
+	Participants []*hexalog.Participant `protobuf:"bytes,3,rep,name=Participants" json:"Participants,omitempty"`
+}
+
+func (m *WriteStats) Reset()                    { *m = WriteStats{} }
+func (m *WriteStats) String() string            { return proto.CompactTextString(m) }
+func (*WriteStats) ProtoMessage()               {}
+func (*WriteStats) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *WriteStats) GetBallotTime() int64 {
+	if m != nil {
+		return m.BallotTime
+	}
+	return 0
+}
+
+func (m *WriteStats) GetApplyTime() int64 {
+	if m != nil {
+		return m.ApplyTime
+	}
+	return 0
+}
+
+func (m *WriteStats) GetParticipants() []*hexalog.Participant {
+	if m != nil {
+		return m.Participants
+	}
+	return nil
+}
+
+type WriteOptions struct {
+	WaitBallot       bool  `protobuf:"varint,1,opt,name=WaitBallot" json:"WaitBallot,omitempty"`
+	WaitApply        bool  `protobuf:"varint,2,opt,name=WaitApply" json:"WaitApply,omitempty"`
+	WaitApplyTimeout int64 `protobuf:"varint,3,opt,name=WaitApplyTimeout" json:"WaitApplyTimeout,omitempty"`
+	Retries          int32 `protobuf:"varint,4,opt,name=Retries" json:"Retries,omitempty"`
+	RetryInterval    int64 `protobuf:"varint,5,opt,name=RetryInterval" json:"RetryInterval,omitempty"`
+}
+
+func (m *WriteOptions) Reset()                    { *m = WriteOptions{} }
+func (m *WriteOptions) String() string            { return proto.CompactTextString(m) }
+func (*WriteOptions) ProtoMessage()               {}
+func (*WriteOptions) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *WriteOptions) GetWaitBallot() bool {
+	if m != nil {
+		return m.WaitBallot
+	}
+	return false
+}
+
+func (m *WriteOptions) GetWaitApply() bool {
+	if m != nil {
+		return m.WaitApply
+	}
+	return false
+}
+
+func (m *WriteOptions) GetWaitApplyTimeout() int64 {
+	if m != nil {
+		return m.WaitApplyTimeout
+	}
+	return 0
+}
+
+func (m *WriteOptions) GetRetries() int32 {
+	if m != nil {
+		return m.Retries
+	}
+	return 0
+}
+
+func (m *WriteOptions) GetRetryInterval() int64 {
+	if m != nil {
+		return m.RetryInterval
+	}
+	return 0
+}
+
+type WriteRequest struct {
+	KV      *KVPair       `protobuf:"bytes,1,opt,name=KV" json:"KV,omitempty"`
+	Options *WriteOptions `protobuf:"bytes,2,opt,name=Options" json:"Options,omitempty"`
+}
+
+func (m *WriteRequest) Reset()                    { *m = WriteRequest{} }
+func (m *WriteRequest) String() string            { return proto.CompactTextString(m) }
+func (*WriteRequest) ProtoMessage()               {}
+func (*WriteRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+
+func (m *WriteRequest) GetKV() *KVPair {
+	if m != nil {
+		return m.KV
+	}
+	return nil
+}
+
+func (m *WriteRequest) GetOptions() *WriteOptions {
+	if m != nil {
+		return m.Options
+	}
+	return nil
+}
+
+type WriteResponse struct {
+	KV    *KVPair     `protobuf:"bytes,1,opt,name=KV" json:"KV,omitempty"`
+	Stats *WriteStats `protobuf:"bytes,3,opt,name=Stats" json:"Stats,omitempty"`
+}
+
+func (m *WriteResponse) Reset()                    { *m = WriteResponse{} }
+func (m *WriteResponse) String() string            { return proto.CompactTextString(m) }
+func (*WriteResponse) ProtoMessage()               {}
+func (*WriteResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
+func (m *WriteResponse) GetKV() *KVPair {
+	if m != nil {
+		return m.KV
+	}
+	return nil
+}
+
+func (m *WriteResponse) GetStats() *WriteStats {
+	if m != nil {
+		return m.Stats
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*KVPair)(nil), "fidias.KVPair")
+	proto.RegisterType((*ReadStats)(nil), "fidias.ReadStats")
+	proto.RegisterType((*WriteStats)(nil), "fidias.WriteStats")
+	proto.RegisterType((*WriteOptions)(nil), "fidias.WriteOptions")
+	proto.RegisterType((*WriteRequest)(nil), "fidias.WriteRequest")
+	proto.RegisterType((*WriteResponse)(nil), "fidias.WriteResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -121,8 +305,16 @@ const _ = grpc.SupportPackageIsVersion4
 type FidiasRPCClient interface {
 	// Get key-value pair from remote
 	GetKeyRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (*KVPair, error)
-	// List directory contens for this node
+	// List directory contents for this node
 	ListDirRPC(ctx context.Context, in *KVPair, opts ...grpc.CallOption) (FidiasRPC_ListDirRPCClient, error)
+	// Set key on cluster
+	SetRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
+	// Set key on cluster
+	CASetRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
+	// Remove key on cluster
+	RemoveRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
+	// Remove key on cluster
+	CARemoveRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
 }
 
 type fidiasRPCClient struct {
@@ -174,13 +366,57 @@ func (x *fidiasRPCListDirRPCClient) Recv() (*KVPair, error) {
 	return m, nil
 }
 
+func (c *fidiasRPCClient) SetRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
+	out := new(WriteResponse)
+	err := grpc.Invoke(ctx, "/fidias.FidiasRPC/SetRPC", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fidiasRPCClient) CASetRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
+	out := new(WriteResponse)
+	err := grpc.Invoke(ctx, "/fidias.FidiasRPC/CASetRPC", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fidiasRPCClient) RemoveRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
+	out := new(WriteResponse)
+	err := grpc.Invoke(ctx, "/fidias.FidiasRPC/RemoveRPC", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fidiasRPCClient) CARemoveRPC(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
+	out := new(WriteResponse)
+	err := grpc.Invoke(ctx, "/fidias.FidiasRPC/CARemoveRPC", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for FidiasRPC service
 
 type FidiasRPCServer interface {
 	// Get key-value pair from remote
 	GetKeyRPC(context.Context, *KVPair) (*KVPair, error)
-	// List directory contens for this node
+	// List directory contents for this node
 	ListDirRPC(*KVPair, FidiasRPC_ListDirRPCServer) error
+	// Set key on cluster
+	SetRPC(context.Context, *WriteRequest) (*WriteResponse, error)
+	// Set key on cluster
+	CASetRPC(context.Context, *WriteRequest) (*WriteResponse, error)
+	// Remove key on cluster
+	RemoveRPC(context.Context, *WriteRequest) (*WriteResponse, error)
+	// Remove key on cluster
+	CARemoveRPC(context.Context, *WriteRequest) (*WriteResponse, error)
 }
 
 func RegisterFidiasRPCServer(s *grpc.Server, srv FidiasRPCServer) {
@@ -226,6 +462,78 @@ func (x *fidiasRPCListDirRPCServer) Send(m *KVPair) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _FidiasRPC_SetRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FidiasRPCServer).SetRPC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fidias.FidiasRPC/SetRPC",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FidiasRPCServer).SetRPC(ctx, req.(*WriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FidiasRPC_CASetRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FidiasRPCServer).CASetRPC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fidias.FidiasRPC/CASetRPC",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FidiasRPCServer).CASetRPC(ctx, req.(*WriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FidiasRPC_RemoveRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FidiasRPCServer).RemoveRPC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fidias.FidiasRPC/RemoveRPC",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FidiasRPCServer).RemoveRPC(ctx, req.(*WriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FidiasRPC_CARemoveRPC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FidiasRPCServer).CARemoveRPC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fidias.FidiasRPC/CARemoveRPC",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FidiasRPCServer).CARemoveRPC(ctx, req.(*WriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "fidias.FidiasRPC",
 	HandlerType: (*FidiasRPCServer)(nil),
@@ -233,6 +541,22 @@ var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetKeyRPC",
 			Handler:    _FidiasRPC_GetKeyRPC_Handler,
+		},
+		{
+			MethodName: "SetRPC",
+			Handler:    _FidiasRPC_SetRPC_Handler,
+		},
+		{
+			MethodName: "CASetRPC",
+			Handler:    _FidiasRPC_CASetRPC_Handler,
+		},
+		{
+			MethodName: "RemoveRPC",
+			Handler:    _FidiasRPC_RemoveRPC_Handler,
+		},
+		{
+			MethodName: "CARemoveRPC",
+			Handler:    _FidiasRPC_CARemoveRPC_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -248,19 +572,42 @@ var _FidiasRPC_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 224 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0xd0, 0x41, 0x4b, 0xc3, 0x30,
-	0x14, 0xc0, 0x71, 0x63, 0xb7, 0x8c, 0x3e, 0xa6, 0xc8, 0x43, 0x24, 0x78, 0x0a, 0x3d, 0xe5, 0x62,
-	0x19, 0xfa, 0x11, 0x94, 0x29, 0x74, 0x83, 0x11, 0x64, 0xf7, 0xb8, 0x66, 0xf5, 0x41, 0x35, 0x25,
-	0x8d, 0x87, 0x7e, 0x2d, 0x3f, 0xa1, 0x24, 0xd1, 0x83, 0x9e, 0xbc, 0xe5, 0xf7, 0x27, 0x90, 0xbc,
-	0x07, 0xa5, 0x1f, 0x0e, 0xf5, 0xe0, 0x5d, 0x70, 0xc8, 0x8f, 0xd4, 0x92, 0x19, 0xab, 0x4f, 0x06,
-	0xbc, 0xd9, 0xef, 0x0c, 0x79, 0xbc, 0x80, 0xa2, 0xb1, 0x93, 0x60, 0x92, 0xa9, 0xa5, 0x8e, 0x47,
-	0xbc, 0x84, 0xf9, 0xde, 0xf4, 0x1f, 0x56, 0x9c, 0xa6, 0x96, 0x11, 0xeb, 0xba, 0x37, 0xdd, 0x28,
-	0x0a, 0xc9, 0x54, 0xa1, 0x33, 0x62, 0xdd, 0x3c, 0xd3, 0x9b, 0x15, 0x33, 0xc9, 0xd4, 0x4c, 0x67,
-	0xa0, 0x80, 0xc5, 0xd6, 0xb5, 0xa9, 0xcf, 0x53, 0xff, 0x21, 0x56, 0xb0, 0xdc, 0xba, 0x96, 0x8e,
-	0x74, 0x30, 0x81, 0xdc, 0xbb, 0xe0, 0xe9, 0x89, 0x5f, 0x0d, 0xaf, 0x80, 0x3f, 0x59, 0xea, 0x5e,
-	0x83, 0x58, 0x48, 0xa6, 0xce, 0xf4, 0xb7, 0x6e, 0x7b, 0x28, 0xd7, 0xe9, 0xfb, 0x7a, 0x77, 0x8f,
-	0x37, 0x50, 0x3e, 0xda, 0xd0, 0xd8, 0x29, 0xe2, 0xbc, 0xce, 0x73, 0xd5, 0x79, 0xa6, 0xeb, 0x3f,
-	0xae, 0x4e, 0x70, 0x05, 0xb0, 0xa1, 0x31, 0x3c, 0x90, 0xff, 0xd7, 0xfd, 0x15, 0x7b, 0xe1, 0x69,
-	0x63, 0x77, 0x5f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xc9, 0x5b, 0xd9, 0x1c, 0x3e, 0x01, 0x00, 0x00,
+	// 588 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x5d, 0x6b, 0x13, 0x41,
+	0x14, 0xed, 0x66, 0xbb, 0xdb, 0xe4, 0x36, 0x95, 0x32, 0x54, 0x59, 0x82, 0x94, 0xb0, 0x14, 0x59,
+	0x14, 0xb7, 0xa5, 0x3e, 0xf8, 0x81, 0x2f, 0xb5, 0xd2, 0x2a, 0x69, 0x35, 0x4c, 0x25, 0xc5, 0x17,
+	0x61, 0xba, 0x99, 0xa6, 0x83, 0xdb, 0xcc, 0x3a, 0x33, 0x5b, 0xdc, 0x27, 0x5f, 0xfc, 0x45, 0x3e,
+	0xf9, 0x5b, 0xfc, 0x35, 0x32, 0x77, 0x36, 0x69, 0x12, 0x11, 0x25, 0x6f, 0x73, 0xce, 0x3d, 0x33,
+	0xf7, 0x9c, 0x7b, 0x37, 0x81, 0x96, 0x2a, 0xb2, 0xb4, 0x50, 0xd2, 0x48, 0x12, 0x5e, 0x8a, 0xa1,
+	0x60, 0xba, 0xf3, 0x68, 0x24, 0xcc, 0x55, 0x79, 0x91, 0x66, 0xf2, 0x7a, 0xf7, 0x8a, 0x7f, 0x65,
+	0x17, 0xb9, 0xcc, 0x3e, 0xe3, 0xc9, 0x54, 0x05, 0xdf, 0xd5, 0x46, 0x95, 0x99, 0xd1, 0xee, 0x52,
+	0xe7, 0xc1, 0x5f, 0xc5, 0xb9, 0x1c, 0xed, 0x4e, 0x1f, 0x8f, 0x7f, 0x78, 0x10, 0xf6, 0x06, 0x7d,
+	0x26, 0x14, 0xd9, 0x04, 0xbf, 0xc7, 0xab, 0xc8, 0xeb, 0x7a, 0x49, 0x9b, 0xda, 0x23, 0xd9, 0x82,
+	0x60, 0xc0, 0xf2, 0x92, 0x47, 0x0d, 0xe4, 0x1c, 0xb0, 0xec, 0x51, 0xce, 0x46, 0x3a, 0xf2, 0xbb,
+	0x5e, 0xe2, 0x53, 0x07, 0x2c, 0x7b, 0xf2, 0x41, 0x5c, 0xf3, 0x68, 0xb5, 0xeb, 0x25, 0xab, 0xd4,
+	0x01, 0x12, 0xc1, 0xda, 0xa9, 0x1c, 0x22, 0x1f, 0x20, 0x3f, 0x81, 0x24, 0x86, 0xf6, 0xa9, 0x1c,
+	0x8a, 0x4b, 0x91, 0x31, 0x23, 0xe4, 0x38, 0x0a, 0xb1, 0xc5, 0x1c, 0x47, 0xee, 0x41, 0xf8, 0x86,
+	0x8b, 0xd1, 0x95, 0x89, 0xd6, 0xba, 0x5e, 0xb2, 0x41, 0x6b, 0x14, 0x7f, 0x83, 0x16, 0xe5, 0x6c,
+	0x78, 0x66, 0x98, 0xd1, 0x64, 0x07, 0x82, 0x77, 0x72, 0xc8, 0x75, 0xe4, 0x75, 0xfd, 0x64, 0x7d,
+	0xff, 0x4e, 0x3a, 0x99, 0x48, 0x6a, 0x69, 0xea, 0x8a, 0xd6, 0xde, 0xb1, 0x92, 0x65, 0x81, 0x51,
+	0x02, 0xea, 0x00, 0xe9, 0x40, 0xb3, 0xaf, 0x84, 0x54, 0xc2, 0x54, 0x98, 0x26, 0xa0, 0x53, 0x6c,
+	0x6b, 0x94, 0xeb, 0x62, 0x9a, 0xc9, 0xa7, 0x53, 0x1c, 0x7f, 0xf7, 0x00, 0xce, 0x95, 0x30, 0xdc,
+	0x59, 0xd8, 0x06, 0x78, 0xc5, 0xf2, 0x5c, 0x1a, 0x14, 0x7b, 0x28, 0x9e, 0x61, 0xc8, 0x7d, 0x68,
+	0x1d, 0x14, 0x45, 0x5e, 0x61, 0xb9, 0x81, 0xe5, 0x5b, 0x82, 0x3c, 0x83, 0x76, 0x9f, 0x29, 0x23,
+	0x32, 0x51, 0xb0, 0xb1, 0xb1, 0x63, 0xb5, 0x39, 0xb6, 0xd2, 0x7a, 0x59, 0xe9, 0x4c, 0x91, 0xce,
+	0x29, 0xe3, 0x9f, 0x1e, 0xb4, 0xd1, 0xc6, 0xfb, 0xc2, 0xce, 0x0b, 0x8d, 0x9c, 0x33, 0x61, 0x5c,
+	0x6b, 0x34, 0xd2, 0xa4, 0x33, 0x8c, 0x35, 0x62, 0x11, 0xf6, 0x46, 0x23, 0x4d, 0x7a, 0x4b, 0x90,
+	0x87, 0xb0, 0x39, 0x05, 0xd6, 0x99, 0x2c, 0x4d, 0xbd, 0xe3, 0x3f, 0x78, 0xbb, 0x58, 0xca, 0x8d,
+	0x12, 0x5c, 0xe3, 0x70, 0x02, 0x3a, 0x81, 0x64, 0x07, 0x36, 0xec, 0xb1, 0x7a, 0x3b, 0x36, 0x5c,
+	0xdd, 0xb0, 0x1c, 0x17, 0xef, 0xd3, 0x79, 0x32, 0xfe, 0x54, 0x3b, 0xa7, 0xfc, 0x4b, 0xc9, 0xb5,
+	0x21, 0xdb, 0xd0, 0xe8, 0x0d, 0xd0, 0xb1, 0x5d, 0xa1, 0xfb, 0xe2, 0x53, 0xf7, 0x61, 0xd2, 0x46,
+	0x6f, 0x40, 0x52, 0x58, 0xab, 0x43, 0xa2, 0x6f, 0x3b, 0x9f, 0x5a, 0x34, 0x3b, 0x00, 0x3a, 0x11,
+	0xc5, 0x1f, 0x61, 0xa3, 0x7e, 0x5f, 0x17, 0x72, 0xac, 0xf9, 0x3f, 0x1b, 0x24, 0x10, 0xe0, 0x32,
+	0x31, 0xf1, 0xfa, 0x3e, 0x99, 0x7b, 0x1e, 0x2b, 0xd4, 0x09, 0xf6, 0x7f, 0x35, 0xa0, 0x75, 0x84,
+	0x45, 0xda, 0x3f, 0x24, 0x8f, 0xa1, 0x75, 0xcc, 0x4d, 0x8f, 0x57, 0x16, 0x2c, 0x3c, 0xdc, 0x59,
+	0xc0, 0xf1, 0x0a, 0xd9, 0x03, 0x38, 0x11, 0xda, 0xbc, 0x16, 0xea, 0xbf, 0xf4, 0x7b, 0x1e, 0x79,
+	0x0a, 0xe1, 0x19, 0x37, 0x56, 0x3d, 0x1f, 0xb9, 0x9e, 0x5c, 0xe7, 0xee, 0x02, 0xeb, 0xf2, 0xc6,
+	0x2b, 0xe4, 0x39, 0x34, 0x0f, 0x0f, 0x96, 0xbb, 0xfa, 0xc2, 0xfe, 0xc0, 0xae, 0xe5, 0x0d, 0x5f,
+	0xe2, 0xee, 0x4b, 0x58, 0x3f, 0x3c, 0x58, 0xf6, 0xf6, 0x45, 0x88, 0x7f, 0x4b, 0x4f, 0x7e, 0x07,
+	0x00, 0x00, 0xff, 0xff, 0x9c, 0x92, 0x65, 0x1e, 0x00, 0x05, 0x00, 0x00,
 }

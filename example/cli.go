@@ -2,13 +2,16 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/memberlist"
 	"github.com/hexablock/fidias"
@@ -27,13 +30,41 @@ var (
 	grpcAdvAddr = flag.String("rpc-addr", "127.0.0.1:22345", "RPC advertise addr")
 	// rest - HTTP
 	httpAdvAddr = flag.String("http-addr", "127.0.0.1:9090", "HTTP advertise addr")
-	// Run agent vs a client
-	isAgent = flag.Bool("agent", false, "Start agent")
 	// gossip addresses
 	joinAddr = flag.String("join", os.Getenv("FID_PEERS"), "Existing servers to join via gossip")
+	// agent mode
+	isAgent = flag.Bool("agent", false, "Run the agent")
 	// debug mode
 	debug = flag.Bool("debug", false, "Turn debug mode on")
 )
+
+func usage() {
+	data := []byte(`
+Usage: fid [ options ]
+
+Fidias is a distributed and decentralized datastore with no node being special
+
+Agent:
+
+  -agent [ options ]                Run the fidias agent
+
+    -data-dir <directory>           Data directory
+    -gossip-addr <address:port>     Gossip advertise address
+    -data-addr <address:port>       Data and DHT advertise address
+    -rpc-addr <address:port>        GRPC advertise address
+    -join <peer1,peer2>             List of peers to join
+
+Client:
+
+  set <key> <value>    Set a key-value pair
+  get <key>            Get a key
+  rm  <key>            Remove a key
+  ls  <prefix>         List a prefix
+
+`)
+
+	os.Stderr.Write(data)
+}
 
 type CLI struct{}
 
@@ -66,14 +97,29 @@ func (cli *CLI) runAgent() {
 		dev: fid.BlockDevice(),
 	}
 
+	// opts := []grpc.ServerOption{
+	// 	grpc.Creds(credentials.NewClientTLSFromCert(demoCertPool, *httpAdvAddr)),
+	// }
+	// grpcServer := grpc.NewServer(opts...)
+	//
+	// srv := &http.Server{
+	// 	Addr:    *httpAdvAddr,
+	// 	Handler: grpcHandlerFunc(grpcServer, mux),
+	// 	TLSConfig: &tls.Config{
+	// 		Certificates: []tls.Certificate{*demoKeyPair},
+	// 		NextProtos:   []string{"h2"},
+	// 	},
+	// }
+
 	if err = http.ListenAndServe(*httpAdvAddr, restHandler); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func (cli *CLI) initAgentConfig(datadir string) *fidias.Config {
+
 	c := fidias.DefaultConfig()
-	c.DataDir = datadir
+	c.Phi.DataDir = datadir
 
 	conf := memberlist.DefaultLANConfig()
 	conf.Name = *dataAdvAddr
@@ -90,75 +136,83 @@ func (cli *CLI) initAgentConfig(datadir string) *fidias.Config {
 	conf.BindAddr = host
 	conf.BindPort = port
 
-	c.Memberlist = conf
+	c.Phi.Memberlist = conf
 
-	c.DHT = kelips.DefaultConfig(*dataAdvAddr)
-	c.DHT.Meta["hexalog"] = *grpcAdvAddr
+	c.Phi.DHT = kelips.DefaultConfig(*dataAdvAddr)
+	c.Phi.DHT.Meta["hexalog"] = *grpcAdvAddr
 
-	c.Hexalog = hexalog.DefaultConfig(*grpcAdvAddr)
-	c.Hexalog.Votes = 2
+	c.Phi.Hexalog = hexalog.DefaultConfig(*grpcAdvAddr)
+	c.Phi.Hexalog.Votes = 2
 
-	c.SetHashFunc(sha256.New)
+	c.Phi.SetHashFunc(sha256.New)
 	return c
 }
 
-//
-// func (cli *CLI) initClient() *fidias.Client {
-//
-// 	if *joinAddr == "" {
-// 		fmt.Println("FID_PEERS environment variable not set")
-// 		os.Exit(1)
-// 	}
-//
-// 	conf := fidias.DefaultConfig()
-// 	conf.Peers = strings.Split(*joinAddr, ",")
-// 	client, err := fidias.NewClient(conf)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-//
-// 	return client
-// }
+func (cli *CLI) runClient() error {
+	conf := fidias.DefaultConfig()
+	conf.Peers = strings.Split(*joinAddr, ",")
+	if len(conf.Peers) < 1 || conf.Peers[0] == "" {
+		return fmt.Errorf("FID_PEERS env. variable not set")
+	}
+	conf.Phi.Hexalog.AdvertiseHost = *grpcAdvAddr
 
-// func (cli *CLI) runClient(args []string) {
-// 	client := cli.initClient()
-// 	kvs := client.KVS()
-//
-// 	cmd := args[0]
-//
-// 	switch cmd {
-//
-// 	case "ls":
-// 		cli.runClientLs(kvs, args[1])
-//
-// 	case "cp":
-// 		cli.runClientCp(args[1])
-//
-// 	default:
-// 		fmt.Println("Invalid command:", cmd)
-// 		os.Exit(1)
-// 	}
-//
-// 	//fmt.Println(args)
-//
-// }
+	client, err := fidias.NewClient(conf)
+	if err != nil {
+		return err
+	}
 
-// func (cli *CLI) runClientLs(kvs *fidias.KVS, dirname string) {
-// 	opt := &fidias.ReadOptions{}
-// 	kvps, _, err := kvs.List([]byte(dirname), opt)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		os.Exit(2)
-// 	}
-//
-// 	fmt.Println(kvps)
-// }
-//
-// func (cli *CLI) runClientCp(filename string) {
-//
-// }
+	args := flag.Args()
+	if len(args) < 2 {
+		return fmt.Errorf("not enough args")
+	}
+
+	kv := client.KV()
+
+	wo := fidias.DefaultWriteOptions()
+	key := []byte(args[1])
+
+	var data interface{}
+
+	switch args[0] {
+	case "get":
+		data, _, err = kv.Get(key, &fidias.ReadOptions{})
+
+	case "set":
+		if len(args) != 3 {
+			err = fmt.Errorf("not enough args")
+			break
+		}
+		kvp := fidias.NewKVPair(key, []byte(args[2]))
+		data, _, err = kv.Set(kvp, wo)
+
+	case "rm":
+		_, err = kv.Remove(key, wo)
+
+	case "ls":
+		if len(args) != 2 {
+			err = fmt.Errorf("prefix not specified")
+			break
+		}
+		data, _, err = kv.List([]byte(args[1]), &fidias.ReadOptions{})
+
+	default:
+		err = fmt.Errorf("command not found: %s", args[0])
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if data != nil {
+		b, _ := json.MarshalIndent(data, "", "  ")
+		os.Stdout.Write(b)
+		os.Stdout.Write([]byte("\n"))
+	}
+	return nil
+}
 
 func (cli *CLI) Run() {
+	flag.Usage = usage
 	flag.Parse()
 
 	if *debug {
@@ -169,12 +223,14 @@ func (cli *CLI) Run() {
 		log.SetLevel("INFO")
 	}
 
-	// if *isAgent {
-	// 	cli.runAgent()
-	// } else {
-	// 	cli.runClient(flag.Args())
-	// }
-	cli.runAgent()
+	if *isAgent {
+		cli.runAgent()
+	} else {
+		if err := cli.runClient(); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+			os.Exit(2)
+		}
+	}
 
 }
 

@@ -7,6 +7,7 @@ import (
 	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
 	"github.com/hexablock/log"
+	"github.com/hexablock/phi"
 )
 
 const (
@@ -52,7 +53,7 @@ type FSM struct {
 	kvs KVStore
 
 	// DHT
-	dht DHT
+	dht phi.DHT
 }
 
 // NewFSM inits a new FSM. localTuple is the local host port tuple for the dht
@@ -66,7 +67,7 @@ func NewFSM(kvprefix string, localTuple kelips.TupleHost, kvs KVStore) *FSM {
 
 // RegisterDHT registers the dht to the state machine.  THis is to allow inserts
 // to the dht when keys log entries are applied
-func (fsm *FSM) RegisterDHT(dht DHT) {
+func (fsm *FSM) RegisterDHT(dht phi.DHT) {
 	fsm.dht = dht
 }
 
@@ -122,13 +123,14 @@ func (fsm *FSM) applyKVSet(entryID []byte, entry *hexalog.Entry, value []byte) e
 	// Insert any directories created to dht
 	for _, c := range createdDirs {
 		nskey := append(fsm.kvprefix, c.Key...)
+		log.Printf("%s", nskey)
 		if er := fsm.dht.Insert(nskey, fsm.localTuple); er != nil {
 			log.Println("[ERROR] FSM dht insert failed:", er)
 			err = er
 		}
 	}
 
-	log.Printf("[DEBUG] FSM nskey=%s dirs-created=%d height=%d error='%v'",
+	log.Printf("[DEBUG] FSM nskey=%s op=set dirs-created=%d height=%d error='%v'",
 		entry.Key, len(createdDirs), kv.Height, err)
 
 	return err
@@ -139,7 +141,8 @@ func (fsm *FSM) applyKVDelete(entry *hexalog.Entry) error {
 	key := bytes.TrimPrefix(entry.Key, fsm.kvprefix)
 	err := fsm.kvs.Remove(key)
 	if err == nil {
-		err = fsm.dht.Delete(entry.Key)
+		err = fsm.dht.Delete(entry.Key, fsm.localTuple)
 	}
+	log.Printf("[DEBUG] FSM nskey=%s op=delete height=%d error='%v'", entry.Key, entry.Height, err)
 	return err
 }

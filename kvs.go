@@ -9,28 +9,29 @@ import (
 
 	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
+	"github.com/hexablock/phi"
 
 	"github.com/hexablock/hexalog"
 )
 
 // WriteStats contains stats regarding a write operation to the log
-type WriteStats struct {
-	BallotTime   time.Duration
-	ApplyTime    time.Duration
-	Participants []*hexalog.Participant
-}
+// type WriteStats struct {
+// 	BallotTime   time.Duration
+// 	ApplyTime    time.Duration
+// 	Participants []*hexalog.Participant
+// }
 
 // ReadStats contains reod operation stats
-type ReadStats struct {
-	// Node serving the read
-	Nodes []*hexatype.Node
-	// Affinity group
-	Group int
-	// Node priority in the group
-	Priority int
-	// Response time
-	RespTime time.Duration
-}
+// type ReadStats struct {
+// 	// Node serving the read
+// 	Nodes []*hexatype.Node
+// 	// Affinity group
+// 	Group int
+// 	// Node priority in the group
+// 	Priority int
+// 	// Response time
+// 	RespTime time.Duration
+// }
 
 // NewKVPair inits a new kv pair with the key and value.
 func NewKVPair(key, value []byte) *KVPair {
@@ -67,22 +68,22 @@ func (kvp KVPair) MarshalJSON() ([]byte, error) {
 type ReadOptions struct{}
 
 // WriteOptions contains options to perform write operation
-type WriteOptions struct {
-	WaitBallot       bool
-	WaitApply        bool
-	WaitApplyTimeout time.Duration
-	Retries          int
-	RetryInterval    time.Duration
-}
+// type WriteOptions struct {
+// 	WaitBallot       bool
+// 	WaitApply        bool
+// 	WaitApplyTimeout time.Duration
+// 	Retries          int
+// 	RetryInterval    time.Duration
+// }
 
 // DefaultWriteOptions returns a sane set of WriteOptions defaults
 func DefaultWriteOptions() *WriteOptions {
 	return &WriteOptions{
 		WaitBallot:       true,
 		WaitApply:        true,
-		WaitApplyTimeout: 2 * time.Second,
+		WaitApplyTimeout: (2 * time.Second).Nanoseconds(),
 		Retries:          3,
-		RetryInterval:    35 * time.Millisecond,
+		RetryInterval:    (35 * time.Millisecond).Nanoseconds(),
 	}
 }
 
@@ -96,23 +97,24 @@ type KVTransport interface {
 // KVS is a consistent key value store.  It performs write operations by writing
 // entries to hexalog which are applied by the FSM to the KVStore
 type KVS struct {
-	// Prefix to use for log entries
+	// Prefix to use for log entries.  This allows to serve multiple namespaces
+	// with the same logic
 	prefix []byte
 
 	// Transport for read requests
 	trans KVTransport
 
 	// Log for write requests
-	hxl WAL
+	hxl phi.WAL
 
 	// DHT used for lookups to perform gets
-	dht DHT
+	dht phi.DHT
 }
 
 // NewKVS inits a new KVS instance using the store for reads and write
 // operations by appending entries to the log
 //func NewKVS(host, prefix string, kvstore KVStore, wal WAL, remote KVTransport, dht DHT) *KVS {
-func NewKVS(prefix string, wal WAL, trans KVTransport, dht DHT) *KVS {
+func NewKVS(prefix string, wal phi.WAL, trans KVTransport, dht phi.DHT) *KVS {
 	kv := &KVS{
 		prefix: []byte(prefix),
 		hxl:    wal,
@@ -145,7 +147,7 @@ func (kvs *KVS) Get(key []byte, opt *ReadOptions) (*KVPair, *ReadStats, error) {
 
 	for i, n := range nodes {
 		meta := n.Metadata()
-		log.Println("[DEBUG] KVS.Get", meta)
+
 		kvp, err = kvs.trans.GetKey(context.Background(), meta["hexalog"], key)
 		if err == nil {
 			// Set the node returning the response to the first one in the list
@@ -154,14 +156,14 @@ func (kvs *KVS) Get(key []byte, opt *ReadOptions) (*KVPair, *ReadStats, error) {
 				nodes[0], nodes[i] = nodes[i], nodes[0]
 			}
 			stats.Nodes = nodes
-			stats.Priority = i
-			stats.RespTime = time.Since(start)
+			stats.Priority = int32(i)
+			stats.RespTime = time.Since(start).Nanoseconds()
 			return kvp, stats, nil
 		}
 	}
 	// Set the nodes queried
 	stats.Nodes = nodes
-	stats.RespTime = time.Since(start)
+	stats.RespTime = time.Since(start).Nanoseconds()
 
 	return nil, stats, err
 }
@@ -215,22 +217,22 @@ func (kvs *KVS) List(dir []byte, opt *ReadOptions) ([]*KVPair, *ReadStats, error
 		o = append(o, v)
 	}
 
-	stats.RespTime = time.Since(start)
+	stats.RespTime = time.Since(start).Nanoseconds()
 
 	return o, stats, err
 }
 
 // Set consistently sets a key-value pair by submitting the operation to the log
-func (kvs *KVS) Set(kv *KVPair, wo *WriteOptions) (*KVPair, *WriteStats, error) {
+func (kvs *KVS) Set(kv *KVPair, wo *WriteOptions) (*KVPair, *phi.WriteStats, error) {
 	nskey := append(kvs.prefix, kv.Key...)
 
-	var stats *WriteStats
+	var stats *phi.WriteStats
 
 	ent, peers, err := kvs.hxl.NewEntry(nskey)
 	if err == nil {
 		ent.Data = append([]byte{opKVSet}, kv.Value...)
 		opt := buildLogOpts(peers, wo)
-		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, wo.Retries, wo.RetryInterval); err == nil {
+		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval)); err == nil {
 			kv.Height = ent.Height
 			kv.ModTime = ent.Timestamp
 			kv.LTime = ent.LTime
@@ -245,7 +247,7 @@ func (kvs *KVS) Set(kv *KVPair, wo *WriteOptions) (*KVPair, *WriteStats, error) 
 // CASet checks and sets a key value pair.  mod is the hash id of the last entry
 // used as the appension point.  An error is returned if there is a mismatch
 // otherwise a KVPair with the new Modification and Height is returned
-func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *WriteStats, error) {
+func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *phi.WriteStats, error) {
 	nskey := append(kvs.prefix, kv.Key...)
 
 	last, err := kvs.hxl.GetEntry(nskey, mod)
@@ -253,7 +255,7 @@ func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *Write
 		return nil, nil, err
 	}
 
-	var stats *WriteStats
+	var stats *phi.WriteStats
 
 	ent, peers, err := kvs.hxl.NewEntryFrom(last)
 	if err == nil {
@@ -261,7 +263,7 @@ func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *Write
 		opt := buildLogOpts(peers, wo)
 
 		// Set retries to 1 as the log may be well ahead
-		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, 1, wo.RetryInterval); err == nil {
+		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, 1, time.Duration(wo.RetryInterval)); err == nil {
 			kv.Height = ent.Height
 			return kv, stats, nil
 		}
@@ -273,16 +275,16 @@ func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *Write
 
 // Remove consistently removes a key by submitting a remove operation to the
 // log to be applied by the FSM
-func (kvs *KVS) Remove(key []byte, wo *WriteOptions) (*WriteStats, error) {
+func (kvs *KVS) Remove(key []byte, wo *WriteOptions) (*phi.WriteStats, error) {
 	nskey := append(kvs.prefix, key...)
 
-	var stats *WriteStats
+	var stats *phi.WriteStats
 
 	ent, peers, err := kvs.hxl.NewEntry(nskey)
 	if err == nil {
 		ent.Data = []byte{opKVDel}
 		opt := buildLogOpts(peers, wo)
-		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, wo.Retries, wo.RetryInterval)
+		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval))
 	}
 
 	return stats, err
@@ -290,7 +292,7 @@ func (kvs *KVS) Remove(key []byte, wo *WriteOptions) (*WriteStats, error) {
 
 // CARemove checks the mod hash against the last entry and applies the remove.
 // It returns an error if there is a mismatch
-func (kvs *KVS) CARemove(key []byte, mod []byte, wo *WriteOptions) (*WriteStats, error) {
+func (kvs *KVS) CARemove(key []byte, mod []byte, wo *WriteOptions) (*phi.WriteStats, error) {
 	nskey := append(kvs.prefix, key...)
 
 	last, err := kvs.hxl.GetEntry(nskey, mod)
@@ -298,13 +300,13 @@ func (kvs *KVS) CARemove(key []byte, mod []byte, wo *WriteOptions) (*WriteStats,
 		return nil, err
 	}
 
-	var stats *WriteStats
+	var stats *phi.WriteStats
 
 	ent, peers, err := kvs.hxl.NewEntryFrom(last)
 	if err == nil {
 		ent.Data = []byte{opKVDel}
 		opt := buildLogOpts(peers, wo)
-		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, wo.Retries, wo.RetryInterval)
+		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval))
 	}
 
 	return stats, err
@@ -322,6 +324,6 @@ func buildLogOpts(peers []*hexalog.Participant, opt *WriteOptions) *hexalog.Requ
 	o.WaitBallot = wo.WaitBallot
 	o.WaitApply = wo.WaitApply
 	o.SourceIndex = -1
-	o.WaitApplyTimeout = int32(wo.WaitApplyTimeout.Nanoseconds() / 1000000)
+	o.WaitApplyTimeout = int32(wo.WaitApplyTimeout / 1000000)
 	return o
 }
