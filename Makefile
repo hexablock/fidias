@@ -36,14 +36,12 @@ dist: dist/$(NAME)-windows.zip
 	done;
 
 # Build windows
-dist/$(NAME)d-windows.zip:
+dist/$(NAME)-windows.zip:
 	GOOS=windows $(BUILD_CMD) $(LD_OPTS) -o dist/$(NAME).exe $(SRC_FILES) && \
-	cd dist && zip $(NAME)-windows.zip $(NAME).exe; rm -f dist/$(NAME)d.exe
+	cd dist && zip $(NAME)-windows.zip $(NAME).exe; rm -f dist/$(NAME).exe
 
 protoc:
-	protoc rpc.proto -I ./ -I ../../../ -I ../../../github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis --go_out=plugins=grpc:.
+	protoc rpc.proto -I ./ -I ../../../ -I --go_out=plugins=grpc:.
 
-protoc-reverse-proxy:
-	protoc rpc.proto -I ./ -I ../../../ -I ../../../github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis --grpc-gateway_out=logtostderr=true:.
 
 all: $(NAME)
