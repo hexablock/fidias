@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"encoding/hex"
@@ -11,7 +11,7 @@ import (
 	"github.com/hexablock/go-kelips"
 )
 
-func (server *httpServer) handleDHT(w http.ResponseWriter, r *http.Request, resource string) {
+func (server *HTTPServer) handleDHT(w http.ResponseWriter, r *http.Request, resource string) {
 
 	var (
 		err error
@@ -27,7 +27,7 @@ func (server *httpServer) handleDHT(w http.ResponseWriter, r *http.Request, reso
 		}
 
 		start := time.Now()
-		nodes, er := server.dht.Lookup(id)
+		nodes, er := server.DHT.Lookup(id)
 		if er != nil {
 			err = er
 			break
@@ -50,7 +50,7 @@ func (server *httpServer) handleDHT(w http.ResponseWriter, r *http.Request, reso
 		}
 
 		tuple := kelips.NewTupleHost(hpath[1])
-		err = server.dht.Insert([]byte(hpath[0]), tuple)
+		err = server.DHT.Insert([]byte(hpath[0]), tuple)
 
 	default:
 		w.WriteHeader(405)

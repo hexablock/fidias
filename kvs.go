@@ -82,7 +82,7 @@ func DefaultWriteOptions() *WriteOptions {
 		WaitBallot:       true,
 		WaitApply:        true,
 		WaitApplyTimeout: (2 * time.Second).Nanoseconds(),
-		Retries:          3,
+		Retries:          1,
 		RetryInterval:    (35 * time.Millisecond).Nanoseconds(),
 	}
 }

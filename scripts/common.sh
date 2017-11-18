@@ -7,10 +7,10 @@
 #
 
 # Host
-host=${FIDS_GATEWAY:-"127.0.0.1:7700"}
+host=${FIDS_GATEWAY:-"127.0.0.1:9090"}
 # URL prefixes
-p_blox="v1/blox"
-p_kv="v1/kv"
+p_blox="blox"
+p_kv="kv"
 p_fs="v1/fs"
 p_hexalog="v1/hexalog"
 p_lookup="v1/lookup"

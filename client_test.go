@@ -6,21 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hexablock/phi"
+	"github.com/hexablock/blox"
 )
-
-func Test_Client_errors(t *testing.T) {
-	conf := &Config{}
-	if _, err := NewClient(conf); err == nil {
-		t.Fatal("should fail")
-	}
-	conf.Peers = []string{"test", "test2"}
-	conf.Phi = phi.DefaultConfig()
-	if _, err := NewClient(conf); err == nil {
-		t.Fatal("should fail")
-	}
-
-}
 
 func Test_Client(t *testing.T) {
 
@@ -50,16 +37,16 @@ func Test_Client(t *testing.T) {
 	// BEGIN CLIENT TEST
 
 	conf := DefaultConfig()
-	conf.Peers = []string{"127.0.0.1:42000"}
+	//conf.Peers = []string{"127.0.0.1:42000"}
 	conf.Phi.Hexalog.AdvertiseHost = "127.0.0.1:17081"
 	client, err := NewClient(conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blx := client.Blox()
+	blx := blox.NewBlox(client.dev)
 	rd := ioutil.NopCloser(bytes.NewBuffer([]byte("qaswerfsasdfghjkoiuytrewerfghnfewqwedfvbvdwqwsdsasxzzaqwertyukoioiuytrewghgfbvcxzawwertg")))
-	if err = blx.WriteIndex(rd); err != nil {
+	if _, err = blx.WriteIndex(rd, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,6 +86,20 @@ func Test_Client(t *testing.T) {
 
 	if _, err = kvstore.CARemove(rkv.Key, rkvMod.Modification, wo); err != nil {
 		t.Fatal(err)
+	}
+
+	kv1 := NewKVPair([]byte("key-remove1"), []byte("value"))
+	if _, _, err = kvstore.Set(kv1, wo); err != nil {
+		t.Fatal(err)
+	}
+
+	//<-time.After(100 * time.Millisecond)
+	nodes, err := client.dht.Lookup([]byte("kv/key-remove1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) < 1 {
+		t.Error("lookup has no nodes")
 	}
 
 	fid0.Shutdown()

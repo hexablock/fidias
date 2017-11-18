@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"encoding/hex"
@@ -32,7 +32,7 @@ import (
 // download faster thanks to gzip).
 //
 
-func (server *httpServer) handleBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
+func (server *HTTPServer) handleBlox(w http.ResponseWriter, r *http.Request, resourceID string) {
 	var err error
 
 	switch r.Method {
@@ -55,13 +55,13 @@ func (server *httpServer) handleBlox(w http.ResponseWriter, r *http.Request, res
 
 }
 
-func (server *httpServer) handlerBloxGet(w http.ResponseWriter, resourceID string) error {
+func (server *HTTPServer) handlerBloxGet(w http.ResponseWriter, resourceID string) error {
 	id, err := hex.DecodeString(resourceID)
 	if err != nil {
 		return err
 	}
 
-	asm := blox.NewAssembler(server.dev, 3)
+	asm := blox.NewAssembler(server.Device, 3)
 	idx, err := asm.SetRoot(id)
 	if err != nil {
 		return err
@@ -79,10 +79,10 @@ func (server *httpServer) handlerBloxGet(w http.ResponseWriter, resourceID strin
 	return nil
 }
 
-func (server *httpServer) handlerBloxPost(w http.ResponseWriter, r *http.Request) error {
+func (server *HTTPServer) handlerBloxPost(w http.ResponseWriter, r *http.Request) error {
 	headers := map[string]string{}
 
-	sharder := blox.NewStreamSharder(server.dev, 3)
+	sharder := blox.NewStreamSharder(server.Device, 3)
 	err := sharder.Shard(r.Body)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (server *httpServer) handlerBloxPost(w http.ResponseWriter, r *http.Request
 	headers[headerBlockWriteTime] = fmt.Sprintf("%v", sharder.Runtime())
 
 	data := sharder.IndexBlock()
-	if _, err = server.dev.SetBlock(data); err != nil {
+	if _, err = server.Device.SetBlock(data); err != nil {
 
 		if err == block.ErrBlockExists {
 			// The server has fulfilled a request for the resource, and the response

@@ -8,6 +8,7 @@ import (
 	"github.com/hexablock/blox"
 	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/phi"
 )
 
@@ -35,6 +36,8 @@ func (kv *KV) Set(kvp *KVPair, wo *WriteOptions) (*KVPair, *WriteStats, error) {
 	return resp.KV, resp.Stats, nil
 }
 
+// CASet compares the mod and sets the KVPair.  If the mods do not match an
+// error is returned
 func (kv *KV) CASet(kvp *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *WriteStats, error) {
 	conn, err := kv.pool.getConn(kv.walHost)
 	if err != nil {
@@ -83,6 +86,7 @@ func (kv *KV) CARemove(key []byte, mod []byte, wo *WriteOptions) (*WriteStats, e
 	return resp.Stats, err
 }
 
+// Get retreives a key on the cluster from the first available node
 func (kv *KV) Get(key []byte, opt *ReadOptions) (*KVPair, *ReadStats, error) {
 	return kv.kvs.Get(key, opt)
 }
@@ -110,20 +114,23 @@ type Client struct {
 
 	// outbound grpc pool
 	pool *outPool
+
+	// Initial node used
+	local hexatype.Node
 }
 
 // NewClient inits a new fidias client with the config.
 func NewClient(conf *Config) (client *Client, err error) {
 	client = &Client{conf: conf, pool: newOutPool(300*time.Second, 45*time.Second)}
 
-	if len(conf.Peers) == 0 {
-		err = fmt.Errorf("peers not provided")
+	c := conf.Phi.Hexalog
+	if c.AdvertiseHost == "" {
+		err = fmt.Errorf("WAL host not provided")
 		return
 	}
 
-	c := conf.Phi.Hexalog
-	if c.AdvertiseHost == "" {
-		err = fmt.Errorf("wal host not provided")
+	fidTrans := NewNetTransport(30*time.Second, 300*time.Second)
+	if client.local, err = fidTrans.LocalNode(c.AdvertiseHost); err != nil {
 		return
 	}
 
@@ -136,16 +143,9 @@ func NewClient(conf *Config) (client *Client, err error) {
 	// Init wal
 	ltrans := hexalog.NewNetTransport(30*time.Second, 300*time.Second)
 	client.wal = phi.NewHexalog(ltrans, c.Votes, c.Hasher)
-
-	// transport to for individual host request to get keys and list dirs
-	kvtrans := NewNetTransport(30*time.Second, 300*time.Second)
-	client.kvs = NewKVS(conf.KVPrefix, client.wal, kvtrans, client.dht)
+	client.kvs = NewKVS(conf.KVPrefix, client.wal, fidTrans, client.dht)
 
 	return client, nil
-}
-
-func (client *Client) Blox() *blox.Blox {
-	return blox.NewBlox(client.dev)
 }
 
 // KV returns a key-value client interface
@@ -159,8 +159,7 @@ func (client *Client) KV() *KV {
 }
 
 func (client *Client) initDHT() error {
-
-	dht, err := kelips.NewClient(client.conf.Peers...)
+	dht, err := kelips.NewClient(client.local.Host())
 	if err == nil {
 		client.dht = dht
 	}

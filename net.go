@@ -5,13 +5,17 @@ import (
 	"io"
 	"time"
 
-	kelips "github.com/hexablock/go-kelips"
+	"github.com/hexablock/hexatype"
 	"github.com/hexablock/log"
 )
 
+type LocalNodeProvider interface {
+	LocalNode() hexatype.Node
+}
+
 // NetTransport is the network transport for fidias as a whole
 type NetTransport struct {
-	klp *kelips.Kelips
+	localProv LocalNodeProvider
 
 	kv KVStore
 
@@ -36,6 +40,23 @@ func NewNetTransport(reapInterval, maxIdle time.Duration) *NetTransport {
 // Register registers a KVStore the transport will use to serve requests
 func (trans *NetTransport) Register(kvs KVStore) {
 	trans.kv = kvs
+}
+
+// LocalNode returns the LocalNode from the remote host
+func (trans *NetTransport) LocalNode(host string) (hexatype.Node, error) {
+	var n hexatype.Node
+	conn, err := trans.pool.getConn(host)
+	if err != nil {
+		return n, err
+	}
+
+	node, err := conn.client.LocalNodeRPC(context.Background(), &Request{})
+	trans.pool.returnConn(conn)
+	if err == nil {
+		n = *node
+	}
+
+	return n, err
 }
 
 // GetKey retrieves a key from the single host.  It returns an error if not found
@@ -168,6 +189,11 @@ func (trans *NetTransport) ListDirRPC(in *KVPair, stream FidiasRPC_ListDirRPCSer
 	})
 
 	return err
+}
+
+func (trans *NetTransport) LocalNodeRPC(ctx context.Context, req *Request) (*hexatype.Node, error) {
+	node := trans.localProv.LocalNode()
+	return &node, nil
 }
 
 // Shutdown shuts the outbound connection pool

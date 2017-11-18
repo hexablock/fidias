@@ -1,8 +1,8 @@
 #!/bin/sh
-set -e
+set -ex
 
-NAME="fidiasd"
-DEFAULTS="-bind-addr=0.0.0.0:32100 -http-addr=0.0.0.0:7700"
+NAME="fid"
+DEFAULTS="-agent -gossip-bind-addr=0.0.0.0:32100 -data-bind-addr=0.0.0.0:42100 -rpc-bind-addr=0.0.0.0:8800 -http-addr=0.0.0.0:9090"
 
 # If the first arg starts with '-', append to the defaults
 if [ "${1:0:1}" = '-' ]; then

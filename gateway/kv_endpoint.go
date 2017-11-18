@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/hexablock/phi"
 )
 
-func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resource string) {
+func (server *HTTPServer) handleKV(w http.ResponseWriter, r *http.Request, resource string) {
 	var (
 		data  interface{}
 		err   error
@@ -26,13 +26,13 @@ func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resou
 		)
 
 		// Get KVPair
-		if kv, rstats, err = server.kvs.Get(key, nil); err != nil {
+		if kv, rstats, err = server.KVS.Get(key, nil); err != nil {
 			break
 		}
 
 		// List contents if directory
 		if kv.IsDir() {
-			data, rstats, err = server.kvs.List(key, &fidias.ReadOptions{})
+			data, rstats, err = server.KVS.List(key, &fidias.ReadOptions{})
 		} else {
 			data = kv
 			setNodeGroupHeaders(w, int(rstats.Group), int(rstats.Priority), *rstats.Nodes[0])
@@ -45,12 +45,12 @@ func (server *httpServer) handleKV(w http.ResponseWriter, r *http.Request, resou
 		if value, err = ioutil.ReadAll(r.Body); err == nil {
 			wo := fidias.DefaultWriteOptions()
 			kv := fidias.NewKVPair([]byte(resource), value)
-			data, stats, err = server.kvs.Set(kv, wo)
+			data, stats, err = server.KVS.Set(kv, wo)
 		}
 
 	case "DELETE":
 		wo := fidias.DefaultWriteOptions()
-		stats, err = server.kvs.Remove([]byte(resource), wo)
+		stats, err = server.KVS.Remove([]byte(resource), wo)
 
 	}
 

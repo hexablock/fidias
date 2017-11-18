@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"encoding/json"
@@ -33,13 +33,13 @@ var accessControlHeaders = map[string]string{
 	"Access-Control-Allow-Origin": "*",
 }
 
-type httpServer struct {
-	dht phi.DHT
-	dev *phi.BlockDevice
-	kvs *fidias.KVS
+type HTTPServer struct {
+	DHT    phi.DHT
+	Device *phi.BlockDevice
+	KVS    *fidias.KVS
 }
 
-func (server *httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqpath := r.URL.Path[1:]
 	if reqpath == "" {
 		w.WriteHeader(404)

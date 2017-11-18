@@ -88,7 +88,7 @@ func Test_Fidias(t *testing.T) {
 	rd, _ := os.Open("./pool.go")
 	defer rd.Close()
 
-	if err = blx.WriteIndex(rd); err != nil {
+	if _, err = blx.WriteIndex(rd, 2); err != nil {
 		t.Fatal(err)
 	}
 

@@ -2,6 +2,7 @@ package fidias
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	kelips "github.com/hexablock/go-kelips"
@@ -47,13 +48,42 @@ func Create(conf *Config) (*Fidias, error) {
 
 	fid.phi = ph
 	fid.kvs = NewKVS(fid.conf.KVPrefix, fid.phi.WAL(), kvtrans, fid.phi.DHT())
+
 	kvnet.kvs = fid.kvs
+	kvnet.localProv = ph
 
 	return fid, nil
 }
 
 func (fidias *Fidias) Join(existing []string) error {
 	return fidias.phi.Join(existing)
+}
+
+// RetryJoin keeps looping through the available peers to join.  It implements a backoff
+// for each retry
+func (fidias *Fidias) RetryJoin(existing []string) error {
+
+	retryInSec := 2
+	tries := 0
+
+	for {
+		tries++
+		// Exponential backoff every 3 tries
+		if tries == 3 {
+			tries = 0
+			retryInSec *= retryInSec
+		}
+
+		// Try join
+		err := fidias.phi.Join(existing)
+		if err == nil {
+			return nil
+		}
+		log.Printf("Failed to connect: %v. Retrying in %d secs...", err, retryInSec)
+
+		<-time.After(time.Duration(retryInSec) * time.Second)
+	}
+
 }
 
 // DHT returns a distributed hash table interface
