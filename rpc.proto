@@ -10,6 +10,7 @@ import "github.com/hexablock/hexalog/rpc.proto";
 service FidiasRPC {
     // Returns local node info
     rpc LocalNodeRPC(Request) returns (hexatype.Node) {}
+
     // Get key-value pair from a single remote
     rpc GetKeyRPC(KVPair) returns (KVPair) {}
 
@@ -84,10 +85,6 @@ message WriteRequest {
 message Request {
 
 }
-// message ReadResponse {
-//     KVPair KV = 1;
-//     ReadStats Stats = 2;
-// }
 
 message WriteResponse {
     KVPair KV = 1;

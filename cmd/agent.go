@@ -63,6 +63,7 @@ func (cli *CLI) initAgentConfig() *fidias.Config {
 	c.Phi.Memberlist = initMemberlistConf()
 
 	c.Phi.DHT = kelips.DefaultConfig(*dataAdvAddr)
+	c.Phi.DHT.NumGroups = 3
 	c.Phi.DHT.Meta["hexalog"] = *grpcAdvAddr
 
 	c.Phi.Hexalog = hexalog.DefaultConfig(*grpcAdvAddr)

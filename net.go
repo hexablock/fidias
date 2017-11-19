@@ -180,6 +180,7 @@ func (trans *NetTransport) GetKeyRPC(ctx context.Context, in *KVPair) (*KVPair, 
 // ListDirRPC serves a list dir request from the local store.  It streams all
 // kv's for a given dir
 func (trans *NetTransport) ListDirRPC(in *KVPair, stream FidiasRPC_ListDirRPCServer) error {
+	log.Printf("[DEBUG] NetTransport.ListDirRPC key=%s", in.Key)
 	var err error
 	trans.kv.Iter(in.Key, false, func(kv *KVPair) bool {
 		if err = stream.Send(kv); err != nil {

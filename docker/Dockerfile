@@ -14,7 +14,7 @@ EXPOSE 32100/tcp 32100/udp
 EXPOSE 42100/tcp 42100/udp
 # RPC
 EXPOSE 8800
-# Gateway
+# HTTP 1.1 Gateway
 EXPOSE 9090
 
 ADD dist/fid-linux.tgz /bin/
