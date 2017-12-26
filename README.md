@@ -10,9 +10,13 @@ distributed-hash-tables to name a few.
 - Completely distributed and decentralized with no single-points-of-failure
 - Distributed Write-Ahead-Log for consensus
 - Distributed Hash Table
-- Distributed Content-Addressable block based storage
+- Distributed Content-Addressable-Storage
 - Automatic data de-duplication
+
+### In Development
+
 - Automatic replication and healing
+- Data balancing and rebalancing
 
 ### Development
 

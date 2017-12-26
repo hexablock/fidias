@@ -45,5 +45,5 @@ for i in `seq $COUNT`; do
 
 done
 
-trap "{ pkill -9 -f "${BIN} -debug -agent"; }" SIGINT SIGTERM
+trap "{ pkill -9 "${BIN}"; }" SIGINT SIGTERM
 wait

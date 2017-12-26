@@ -66,6 +66,7 @@ func (server *HTTPServer) handlerBloxGet(w http.ResponseWriter, resourceID strin
 	if err != nil {
 		return err
 	}
+
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", idx.FileSize()))
 	w.Header().Set(headerBlockSize, fmt.Sprintf("%d", idx.BlockSize()))
 	w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))

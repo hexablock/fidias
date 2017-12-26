@@ -3,21 +3,26 @@ package main
 import (
 	"crypto/sha256"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"path/filepath"
 
 	"github.com/hashicorp/memberlist"
+
 	"github.com/hexablock/fidias"
 	"github.com/hexablock/fidias/gateway"
 	kelips "github.com/hexablock/go-kelips"
 	"github.com/hexablock/hexalog"
+	"github.com/hexablock/log"
 )
 
 func (cli *CLI) runAgent() error {
 	err := initAdvertiseAddresses()
 	if err != nil {
 		return err
+	}
+
+	if *debug {
+		log.SetPrefix(*gossipAdvAddr + " | ")
 	}
 
 	conf := cli.initAgentConfig()
