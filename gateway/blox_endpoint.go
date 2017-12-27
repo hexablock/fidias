@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/hexablock/blox"
 	"github.com/hexablock/blox/block"
@@ -69,7 +70,7 @@ func (server *HTTPServer) handlerBloxGet(w http.ResponseWriter, resourceID strin
 
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", idx.FileSize()))
 	w.Header().Set(headerBlockSize, fmt.Sprintf("%d", idx.BlockSize()))
-	w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))
+	//w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))
 	w.Header().Set(headerBlockCount, fmt.Sprintf("%d", idx.BlockCount()))
 
 	//  Cannot send an error
@@ -84,6 +85,15 @@ func (server *HTTPServer) handlerBloxPost(w http.ResponseWriter, r *http.Request
 	headers := map[string]string{}
 
 	sharder := blox.NewStreamSharder(server.Device, 3)
+	// assume mbytes
+	if bsize := r.URL.Query().Get("bs"); bsize != "" {
+		bs, err := strconv.ParseInt(bsize, 10, 64)
+		if err != nil {
+			return err
+		}
+		sharder.SetBlockSize(uint64(bs * 1024 * 1024))
+	}
+
 	err := sharder.Shard(r.Body)
 	if err != nil {
 		return err

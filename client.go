@@ -173,6 +173,6 @@ func (client *Client) initBlockDevice() {
 	opt := blox.DefaultNetClientOptions(c.Phi.HashFunc)
 	trans := blox.NewNetTransport(opt)
 
-	client.dev = phi.NewBlockDevice(c.Phi.Replicas, c.Phi.HashFunc, trans)
+	client.dev = phi.NewBlockDevice(c.Phi.Replicas, c.Phi.HashFunc, hexatype.Node{}, nil, trans)
 	client.dev.RegisterDHT(client.dht)
 }
