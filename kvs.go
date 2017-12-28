@@ -230,9 +230,11 @@ func (kvs *KVS) Set(kv *KVPair, wo *WriteOptions) (*KVPair, *phi.WriteStats, err
 
 	ent, peers, err := kvs.hxl.NewEntry(nskey)
 	if err == nil {
+
 		ent.Data = append([]byte{opKVSet}, kv.Value...)
 		opt := buildLogOpts(peers, wo)
-		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval)); err == nil {
+		retryOpt := &phi.RetryOptions{Retries: int(wo.Retries), RetryInterval: time.Duration(wo.RetryInterval)}
+		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, retryOpt); err == nil {
 			kv.Height = ent.Height
 			kv.ModTime = ent.Timestamp
 			kv.LTime = ent.LTime
@@ -261,9 +263,9 @@ func (kvs *KVS) CASet(kv *KVPair, mod []byte, wo *WriteOptions) (*KVPair, *phi.W
 	if err == nil {
 		ent.Data = append([]byte{opKVSet}, kv.Value...)
 		opt := buildLogOpts(peers, wo)
-
+		retryOpt := &phi.RetryOptions{Retries: 1, RetryInterval: time.Duration(wo.RetryInterval)}
 		// Set retries to 1 as the log may be well ahead
-		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, 1, time.Duration(wo.RetryInterval)); err == nil {
+		if kv.Modification, stats, err = kvs.hxl.ProposeEntry(ent, opt, retryOpt); err == nil {
 			kv.Height = ent.Height
 			return kv, stats, nil
 		}
@@ -284,7 +286,8 @@ func (kvs *KVS) Remove(key []byte, wo *WriteOptions) (*phi.WriteStats, error) {
 	if err == nil {
 		ent.Data = []byte{opKVDel}
 		opt := buildLogOpts(peers, wo)
-		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval))
+		retryOpt := &phi.RetryOptions{Retries: int(wo.Retries), RetryInterval: time.Duration(wo.RetryInterval)}
+		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, retryOpt)
 	}
 
 	return stats, err
@@ -306,7 +309,8 @@ func (kvs *KVS) CARemove(key []byte, mod []byte, wo *WriteOptions) (*phi.WriteSt
 	if err == nil {
 		ent.Data = []byte{opKVDel}
 		opt := buildLogOpts(peers, wo)
-		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, int(wo.Retries), time.Duration(wo.RetryInterval))
+		retryOpt := &phi.RetryOptions{Retries: int(wo.Retries), RetryInterval: time.Duration(wo.RetryInterval)}
+		_, stats, err = kvs.hxl.ProposeEntry(ent, opt, retryOpt)
 	}
 
 	return stats, err

@@ -70,8 +70,8 @@ func (server *HTTPServer) handlerBloxGet(w http.ResponseWriter, resourceID strin
 
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", idx.FileSize()))
 	w.Header().Set(headerBlockSize, fmt.Sprintf("%d", idx.BlockSize()))
-	//w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))
 	w.Header().Set(headerBlockCount, fmt.Sprintf("%d", idx.BlockCount()))
+	//w.Header().Set(headerBlockReadTime, fmt.Sprintf("%v", asm.Runtime()))
 
 	//  Cannot send an error
 	if err = asm.Assemble(w); err != nil {

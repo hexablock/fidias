@@ -34,11 +34,6 @@ type KVStore interface {
 	Iter(prefix []byte, recurse bool, f func(kv *KVPair) bool)
 }
 
-// type fsm interface {
-// 	Apply(entryID []byte, entry *hexalog.Entry) interface{}
-// 	RegisterDHT(dht DHT)
-// }
-
 // FSM is a hexalog FSM for an in-memory key-value store.  It implements the
 // FSM interface and provides a get function to retrieve keys as all write
 // are handled by the FSM
