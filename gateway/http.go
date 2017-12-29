@@ -125,7 +125,12 @@ func writeJSONResponse(w http.ResponseWriter, code int, headers map[string]strin
 			if t, ok := data.([]byte); ok {
 				b = t
 			} else {
-				b, _ = json.Marshal(data)
+				if b, err = json.Marshal(data); err != nil {
+
+					c = 500
+					b = []byte(`{"error":"` + err.Error() + `"}`)
+
+				}
 			}
 		}
 
