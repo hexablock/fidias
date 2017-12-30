@@ -12,10 +12,12 @@ import (
 )
 
 func (server *HTTPServer) handleDHT(w http.ResponseWriter, r *http.Request, resource string) {
+	if resource == "" {
+		w.WriteHeader(404)
+		return
+	}
 
-	var (
-		err error
-	)
+	var err error
 
 	w.Header().Set("Content-Type", "application/json")
 

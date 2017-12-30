@@ -108,9 +108,9 @@ func (server *HTTPServer) handlerBloxPost(w http.ResponseWriter, r *http.Request
 	if _, err = server.Device.SetBlock(data); err != nil {
 
 		if err == block.ErrBlockExists {
-			// The server has fulfilled a request for the resource, and the response
-			// is a representation of the result of one or more instance
-			// manipulations applied to the current instance
+			// The server has fulfilled a request for the resource, and the
+			// response is a representation of the result of one or more
+			// instance manipulations applied to the current instance.
 			code = 226
 			err = nil
 		}

@@ -10,6 +10,11 @@ import (
 )
 
 func (server *HTTPServer) handleKV(w http.ResponseWriter, r *http.Request, resource string) {
+	if resource == "" {
+		w.WriteHeader(404)
+		return
+	}
+
 	var (
 		data  interface{}
 		err   error

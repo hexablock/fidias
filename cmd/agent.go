@@ -16,7 +16,7 @@ import (
 )
 
 func (cli *CLI) runAgent() error {
-	err := initAdvertiseAddresses()
+	err := initAdvertiseAddrs()
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (cli *CLI) runAgent() error {
 		log.SetPrefix(*gossipAdvAddr + " | ")
 	}
 
-	conf := cli.initAgentConfig()
+	conf := initAgentConf()
 
 	fid, err := fidias.Create(conf)
 	if err != nil {
@@ -53,7 +53,7 @@ func (cli *CLI) runAgent() error {
 	return http.ListenAndServe(*httpAddr, restHandler)
 }
 
-func (cli *CLI) initAgentConfig() *fidias.Config {
+func initAgentConf() *fidias.Config {
 	if *dataDir == "" {
 		log.Fatal("[ERROR] Data directory required!")
 	}
@@ -92,7 +92,7 @@ func initMemberlistConf() *memberlist.Config {
 	return conf
 }
 
-func initAdvertiseAddresses() error {
+func initAdvertiseAddrs() error {
 	var err error
 
 	if *dataAdvAddr, err = buildAdvertiseAddr(*dataAdvAddr, *dataBindAddr); err != nil {

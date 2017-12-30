@@ -33,6 +33,7 @@ var accessControlHeaders = map[string]string{
 	"Access-Control-Allow-Origin": "*",
 }
 
+// HTTPServer is the http server implementing 'rest' protocol
 type HTTPServer struct {
 	DHT    phi.DHT
 	Device *phi.BlockDevice
@@ -46,24 +47,18 @@ func (server *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resource may be empty and is left up to the specific implementation to
+	// handle
 	endpoint, resource := parseDirBase(reqpath)
 
 	switch endpoint {
 	case "dht":
-		if resource == "" {
-			w.WriteHeader(404)
-			return
-		}
 		server.handleDHT(w, r, resource)
 
 	case "blox":
 		server.handleBlox(w, r, resource)
 
 	case "kv":
-		if resource == "" {
-			w.WriteHeader(404)
-			return
-		}
 		server.handleKV(w, r, resource)
 
 	default:
