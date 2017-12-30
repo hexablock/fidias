@@ -3,51 +3,93 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/AndreasBriese/bbloom"
+  name = "github.com/armon/go-metrics"
   packages = ["."]
-  revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
+  revision = "7aa49fde808223f8dadfdbfd3a20ff6c19e5f9ec"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/dgraph-io/badger"
-  packages = [".","options","protos","skl","table","y"]
-  revision = "935ef5ddf169f2bb3fa1d2a44144e07f1538197c"
+  name = "github.com/boltdb/bolt"
+  packages = ["."]
+  revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
+  version = "v1.3.1"
 
 [[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
-  revision = "11b8df160996e00fd4b55cbaafb3d84ec6d50fa8"
+  revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/errwrap"
+  packages = ["."]
+  revision = "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-immutable-radix"
+  packages = ["."]
+  revision = "8aac2701530899b64bdea735a1de8da899815220"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-msgpack"
+  packages = ["codec"]
+  revision = "fa3f63826f7c23912c15263591e65d54d080b458"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-multierror"
+  packages = ["."]
+  revision = "b7773ae218740a7be65057fc60b366a49b538a44"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-sockaddr"
+  packages = ["."]
+  revision = "9b4c5fa5b10a683339a270d664474b9f4aee62fc"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/golang-lru"
+  packages = ["simplelru"]
+  revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+
+[[projects]]
+  name = "github.com/hashicorp/memberlist"
+  packages = ["."]
+  revision = "ce8abaa0c60c2d6bee7219f5ddf500e0a1457b28"
+  version = "v0.1.0"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/blox"
-  packages = [".","block","device","filesystem","utils"]
-  revision = "a2c5c96dab8f9db6951da7d8c5296a78995c0b18"
+  packages = [".","block","device","utils"]
+  revision = "0ae67737e69c470f6ec9e370b984e75c3498fe4e"
 
 [[projects]]
   branch = "master"
-  name = "github.com/hexablock/go-chord"
-  packages = [".","coordinate"]
-  revision = "7bfc0487db0fc96387641430ba27b3f719f76b7d"
+  name = "github.com/hexablock/go-kelips"
+  packages = ["."]
+  revision = "707c9929590d3c8d336809d6af689230659f9a3e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hexablock/hexa-boltdb"
+  packages = ["."]
+  revision = "611010c19c0ce2e96345d46b4d0f52a8da83dd88"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/hexalog"
-  packages = [".","store"]
-  revision = "77f74df004c7e2de2af569222a92d71f42adb52f"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/hexablock/hexaring"
   packages = ["."]
-  revision = "b34f07f68cb4ad2816ea4346b0e2108cce336eaf"
+  revision = "0c69f90ac239bc7c0eaaafb3b962f9832ed0d5b0"
 
 [[projects]]
   branch = "master"
   name = "github.com/hexablock/hexatype"
   packages = ["."]
-  revision = "60b94ac10a9fcd05bdb9a276fbfe1d2a2512b6cf"
+  revision = "d3c77fbcee4535364d1a93b69c4a208c2b593f69"
 
 [[projects]]
   branch = "master"
@@ -57,49 +99,67 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/minio/blake2b-simd"
+  name = "github.com/hexablock/phi"
   packages = ["."]
-  revision = "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4"
+  revision = "0eaf316207cd415a47483e7b062dbea723e6baec"
 
 [[projects]]
-  name = "github.com/pkg/errors"
+  branch = "master"
+  name = "github.com/hexablock/vivaldi"
   packages = ["."]
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
+  revision = "155e2137d7336f6641f625d09fa032e4badbc19e"
+
+[[projects]]
+  name = "github.com/miekg/dns"
+  packages = ["."]
+  revision = "787fb05a250f045a0c3e676c8c499ed412633f45"
+  version = "v1.0.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/sean-/seed"
+  packages = ["."]
+  revision = "e2103e2c35297fb7e17febb81e49b312087a2372"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = ["ed25519","ed25519/internal/edwards25519"]
+  revision = "95a4943f35d008beabde8c11e5075a1b714e6419"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "8351a756f30f1297fe94bbf4b767ec589c6ea6d0"
+  packages = ["bpf","context","http2","http2/hpack","idna","internal/iana","internal/socket","internal/timeseries","ipv4","ipv6","lex/httplex","trace"]
+  revision = "d866cfc389cec985d6fda2859936a575a55a3ab6"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "062cd7e4e68206d8bab9b18396626e855c992658"
+  revision = "83801418e1b59fb1880e363299581ee543af32ca"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
+  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "595979c8a7bf586b2d293fb42246bf91a0b893d9"
+  revision = "a8101f21cf983e773d0c1133ebc5424792003214"
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
-  revision = "f92cdcd7dcdc69e81b2d7b338479a19a8723cfa3"
-  version = "v1.6.0"
+  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/passthrough","stats","status","tap","transport"]
+  revision = "e687fa4e6424368ece6e4fe727cea2c806a0fcb4"
+  version = "v1.8.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "71f33648c5f3b4f2126c45774b177e15705e6399aaa67619b8177bb9c4941dfc"
+  inputs-digest = "54eec27c7148182bd7ed58b60156adeca6844032f30fb6c66518f0a1c7ec80bb"
   solver-name = "gps-cdcl"
   solver-version = 1
